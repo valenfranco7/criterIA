@@ -78,10 +78,6 @@ const ClassPlanning = () => {
           anthropic_file_id: uploadedFileId,
         },
       });
-      // Auto-activate
-      await apiFetch(`/api/teacher/activities/${activity.id}/activate`, {
-        method: "POST",
-      });
       return activity;
     },
     onSuccess: () => {

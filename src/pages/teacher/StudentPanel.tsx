@@ -107,7 +107,7 @@ const StudentPanel = () => {
               )}
             </div>
             {analytics?.course_summary && (
-              <p className="text-sm font-body text-muted-foreground leading-relaxed">{analytics.course_summary}</p>
+              <p className="text-sm font-body text-muted-foreground leading-relaxed line-clamp-3">{analytics.course_summary}</p>
             )}
           </div>
 

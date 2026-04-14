@@ -9,16 +9,23 @@ import type {
   ListStudentCoursesResponse,
 } from "@contracts";
 
+interface ActivityCard {
+  id: string;
+  title: string;
+  topic: string;
+  inProgress: boolean;
+}
+
 const StudentHome = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState<string>("");
-  const [pendingActivity, setPendingActivity] = useState<{ id: string; title: string; topic: string } | null>(null);
+  const [activities, setActivities] = useState<ActivityCard[]>([]);
   const [totalIdeas, setTotalIdeas] = useState<number>(0);
 
   useEffect(() => {
     async function load() {
       try {
-        const [me, activities, courses] = await Promise.all([
+        const [me, actData, courses] = await Promise.all([
           apiFetch<MeResponse>('/api/me'),
           apiFetch<ListStudentActivitiesResponse>('/api/student/activities'),
           apiFetch<ListStudentCoursesResponse>('/api/student/courses'),
@@ -26,16 +33,21 @@ const StudentHome = () => {
 
         setUserName(me.user.name.split(' ')[0]);
 
-        const pending = activities.items.find(
-          ({ session }) => !session || session.status === 'not_started'
-        );
-        if (pending) {
-          setPendingActivity({
-            id: pending.activity.id,
-            title: pending.activity.title,
-            topic: pending.activity.topic,
-          });
+        // Collect in-progress first, then pending
+        const cards: ActivityCard[] = [];
+
+        for (const item of actData.items) {
+          if (item.session?.status === 'in_progress') {
+            cards.push({ id: item.activity.id, title: item.activity.title, topic: item.activity.topic, inProgress: true });
+          }
         }
+        for (const item of actData.items) {
+          if (!item.session || item.session.status === 'not_started') {
+            cards.push({ id: item.activity.id, title: item.activity.title, topic: item.activity.topic, inProgress: false });
+          }
+        }
+
+        setActivities(cards);
 
         const total = courses.courses.reduce((sum, c) => sum + c.idea_count, 0);
         setTotalIdeas(total);
@@ -51,15 +63,21 @@ const StudentHome = () => {
       <h1 className="text-3xl font-serif mb-2">Hola, {userName || "..."}</h1>
       <p className="text-muted-foreground font-body mb-10">Bienvenida de vuelta.</p>
 
-      {pendingActivity && (
-        <div className="bg-card border border-border rounded-lg p-6 mb-8">
-          <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-2">Actividad pendiente</p>
-          <h2 className="font-serif text-xl mb-1">{pendingActivity.title}</h2>
-          <p className="text-sm text-muted-foreground font-body mb-4">{pendingActivity.topic}</p>
-          <Button onClick={() => navigate(`/estudiante/actividad/${pendingActivity.id}`)}>
-            Empezar
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+      {activities.length > 0 && (
+        <div className="space-y-3 mb-8">
+          {activities.map((act) => (
+            <div key={act.id} className="bg-card border border-border rounded-lg p-6">
+              <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-2">
+                {act.inProgress ? "Actividad en curso" : "Actividad pendiente"}
+              </p>
+              <h2 className="font-serif text-xl mb-1">{act.title}</h2>
+              <p className="text-sm text-muted-foreground font-body mb-4">{act.topic}</p>
+              <Button onClick={() => navigate(`/estudiante/actividad/${act.id}`)}>
+                {act.inProgress ? "Continuar" : "Empezar"}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 

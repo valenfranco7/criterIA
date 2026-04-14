@@ -123,7 +123,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const items = activities.map((activity) => {
       const sessionRow = db
-        .prepare('SELECT * FROM activity_sessions WHERE activity_id = ? AND student_id = ? LIMIT 1')
+        .prepare('SELECT * FROM activity_sessions WHERE activity_id = ? AND student_id = ? ORDER BY started_at DESC LIMIT 1')
         .get(activity.id, user.id) as Record<string, unknown> | undefined;
       return {
         activity,
@@ -155,11 +155,11 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const activity = parseActivity(activityRow);
 
-    const existing = db
+    const existingRows = db
       .prepare('SELECT id, status FROM activity_sessions WHERE activity_id = ? AND student_id = ?')
-      .get(activityId, user.id) as { id: string; status: string } | undefined;
+      .all(activityId, user.id) as Array<{ id: string; status: string }>;
 
-    if (existing) {
+    for (const existing of existingRows) {
       if (existing.status === 'not_started') {
         // Clean up stale seed session — delete messages and session, then proceed
         db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id);

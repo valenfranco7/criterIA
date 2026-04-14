@@ -63,12 +63,12 @@ const TeacherLayout = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
         <header className="px-8 py-5 border-b border-border">
           <h1 className="text-xl font-serif">Hola, Yair</h1>
           <p className="text-sm text-muted-foreground font-body capitalize">{today}</p>
         </header>
-        <div className="flex-1 overflow-auto p-8">
+        <div className="flex-1 overflow-auto p-8 min-w-0">
           <Outlet />
         </div>
       </main>

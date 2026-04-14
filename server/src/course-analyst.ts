@@ -49,7 +49,7 @@ const courseAnalyticsSchema = {
         required: ['group_name', 'student_ids', 'topic', 'rationale'],
       },
     },
-    course_summary: { type: 'string', description: 'Narrative summary of how the course is going overall' },
+    course_summary: { type: 'string', description: 'Concise summary (max 2-3 sentences) of how the course is going overall — focus on actionable insights, not individual student details' },
   },
   required: ['course_comprehension_avg', 'student_rankings', 'accumulated_difficult_topics', 'suggested_groups', 'course_summary'],
 };
@@ -141,6 +141,7 @@ export async function runCourseAnalyst(courseId: string): Promise<CourseAnalytic
     system:
       'Sos un analista pedagógico experto. Te doy los resúmenes de todas las actividades de un curso, el historial de sesiones individuales de cada alumno (con comprensión % y fecha para calcular tendencias), y los perfiles cognitivos de los alumnos. ' +
       'Generá un análisis completo del curso. Para la tendencia de cada alumno, compará su comprensión cronológicamente: si mejoró entre actividades es "improving", si se mantuvo es "stable", si empeoró es "declining". ' +
+      'IMPORTANTE: Sé conciso. El course_summary debe ser de 2-3 oraciones máximo con lo más importante del curso (tendencia general, punto de atención principal). NO menciones alumnos individuales en el summary — eso ya va en student_rankings. Las fortalezas y dificultades de cada alumno deben ser de 1 oración corta cada una. ' +
       'Usá la herramienta submit_course_analysis para devolver el resultado. Escribí todo en español rioplatense, tono profesional.',
     messages: [{ role: 'user', content: input }],
     tools: [

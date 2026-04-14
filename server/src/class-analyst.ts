@@ -46,8 +46,8 @@ const classAnalysisSchema = {
         required: ['group_name', 'student_ids', 'topic', 'rationale'],
       },
     },
-    class_summary: { type: 'string' },
-    suggested_plan: { type: 'string' },
+    class_summary: { type: 'string', description: 'Concise summary (2-3 sentences max) of how the class went — general trend, not individual students' },
+    suggested_plan: { type: 'string', description: 'Brief actionable plan (3-5 bullet points) for the next class' },
   },
   required: [
     'class_comprehension_avg',

@@ -356,6 +356,106 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     });
   });
 
+  // POST /api/teacher/activities/:id/finalize → SSE stream with progress
+  app.post('/activities/:id/finalize', async (req, reply) => {
+    const user = await requireRole(req, reply, 'teacher');
+    if (!user) return;
+
+    const { id: activityId } = req.params as { id: string };
+
+    const activityRow = db
+      .prepare('SELECT * FROM activities WHERE id = ? AND teacher_id = ?')
+      .get(activityId, user.id) as Record<string, unknown> | undefined;
+
+    if (!activityRow) {
+      return reply.code(404).send({ error: 'activity not found' });
+    }
+    if ((activityRow as any).status !== 'active') {
+      return reply.code(400).send({ error: 'activity is not active' });
+    }
+
+    // Set up SSE
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+
+    const send = (data: { step: string; detail?: string; done?: boolean }) => {
+      reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Close all in-progress sessions one by one
+    const openSessions = db
+      .prepare(
+        `SELECT s.id, s.managed_session_id, u.name as student_name
+         FROM activity_sessions s
+         JOIN users u ON u.id = s.student_id
+         WHERE s.activity_id = ? AND s.status = 'in_progress' AND s.managed_session_id IS NOT NULL`
+      )
+      .all(activityId) as Array<{ id: string; managed_session_id: string; student_name: string }>;
+
+    if (openSessions.length > 0) {
+      const { sendCloseAndCollect } = await import('./socratic/agent.js');
+
+      for (let i = 0; i < openSessions.length; i++) {
+        const s = openSessions[i];
+        send({ step: `Cerrando sesión de ${s.student_name}...`, detail: `${i + 1}/${openSessions.length}` });
+
+        try {
+          const r = await sendCloseAndCollect(s.managed_session_id);
+          const now = new Date().toISOString();
+          db.prepare(
+            `UPDATE activity_sessions
+             SET status = 'completed', completed_at = ?, session_summary = ?, teacher_report = ?,
+                 extracted_ideas = ?, comprehension_pct = ?, difficult_topics = ?
+             WHERE id = ?`
+          ).run(
+            now, r.session_summary, r.teacher_report,
+            JSON.stringify(r.extracted_ideas), r.comprehension_pct, JSON.stringify(r.difficult_topics),
+            s.id
+          );
+        } catch (err) {
+          console.error('[finalize] Failed to close session:', err);
+        }
+      }
+    }
+
+    // Generate class analysis
+    send({ step: 'Generando análisis de clase...' });
+    try {
+      const analysisResult = await runClassAnalyst(activityId);
+
+      const summaryId = nanoid();
+      const courseId = (activityRow as any).course_id;
+
+      db.prepare(
+        `INSERT INTO activity_summaries (id, activity_id, course_id, summary, understanding_avg, analysis, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        summaryId, activityId, courseId,
+        analysisResult.summary, analysisResult.understanding_avg,
+        JSON.stringify(analysisResult.analysis),
+        new Date().toISOString()
+      );
+
+      // Fire-and-forget: update course analytics
+      import('./course-analyst.js').then(({ runCourseAnalyst }) => {
+        runCourseAnalyst(courseId).catch((err: any) =>
+          console.error('[finalize] Course analyst failed:', err)
+        );
+      });
+    } catch (err: any) {
+      console.error('[finalize] Analyst failed (continuing with close):', err);
+    }
+
+    // Mark activity as closed
+    db.prepare('UPDATE activities SET status = ? WHERE id = ?').run('closed', activityId);
+
+    send({ step: 'Actividad finalizada', done: true });
+    reply.raw.end();
+  });
+
   // GET /api/teacher/students/:id → TeacherStudentDetail
   app.get('/students/:id', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');

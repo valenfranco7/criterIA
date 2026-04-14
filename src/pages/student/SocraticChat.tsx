@@ -31,11 +31,13 @@ const SocraticChat = () => {
   // On mount: load or start session
   useEffect(() => {
     if (!activityId) return;
+    let cancelled = false;
 
     async function init() {
       try {
         // Find the activity + existing session
         const list = await apiFetch<ListStudentActivitiesResponse>('/api/student/activities');
+        if (cancelled) return;
         const item = list.items.find((i) => i.activity.id === activityId);
 
         if (!item) {
@@ -51,6 +53,7 @@ const SocraticChat = () => {
           const detail = await apiFetch<StudentSessionDetail>(
             `/api/student/sessions/${item.session.id}`
           );
+          if (cancelled) return;
           setSession(detail.session);
           setMessages(detail.messages.filter((m) => m.role !== 'system'));
         } else {
@@ -59,21 +62,25 @@ const SocraticChat = () => {
             `/api/student/activities/${activityId}/start`,
             { method: 'POST' }
           );
+          if (cancelled) return;
           setSession(started.session);
           // Fetch messages after start
           const detail = await apiFetch<StudentSessionDetail>(
             `/api/student/sessions/${started.session.id}`
           );
+          if (cancelled) return;
           setMessages(detail.messages.filter((m) => m.role !== 'system'));
         }
       } catch (e) {
+        if (cancelled) return;
         setError("Error al cargar la actividad.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     init();
+    return () => { cancelled = true; };
   }, [activityId]);
 
   // Auto-scroll on new messages
