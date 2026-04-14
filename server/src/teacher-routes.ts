@@ -30,7 +30,56 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
   app.post('/courses', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
-    reply.code(501).send({ error: 'not_implemented' });
+
+    const body = req.body as {
+      name?: string;
+      year_or_level?: string;
+      student_usernames?: string[];
+    };
+
+    if (!body.name?.trim() || !body.year_or_level?.trim()) {
+      return reply.code(400).send({ error: 'name and year_or_level are required' });
+    }
+
+    const { nanoid } = await import('nanoid');
+
+    // Generate slug: "Historia" + "3ro A" → "historia-3ro-a"
+    const slugBase = (body.name + '-' + body.year_or_level)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove accents
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    // Ensure uniqueness
+    let id = slugBase;
+    const exists = db.prepare('SELECT id FROM courses WHERE id = ?').get(id);
+    if (exists) {
+      id = `${slugBase}-${nanoid(4)}`;
+    }
+
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `INSERT INTO courses (id, teacher_id, name, year_or_level, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(id, user.id, body.name.trim(), body.year_or_level.trim(), now);
+
+    // Insert students (silently skip usernames that don't exist or aren't students)
+    const insertStudent = db.prepare(
+      `INSERT OR IGNORE INTO course_students (course_id, student_id) VALUES (?, ?)`
+    );
+    for (const username of body.student_usernames ?? []) {
+      const student = db
+        .prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`)
+        .get(username) as { id: string } | undefined;
+      if (student) {
+        insertStudent.run(id, student.id);
+      }
+    }
+
+    const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(id);
+    reply.code(201).send({ course });
   });
 
   // GET /api/teacher/courses/:courseId → CourseDetailResponse
