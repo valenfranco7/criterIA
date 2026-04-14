@@ -26,23 +26,26 @@ criterIA/
 └── docs/
 ```
 
-## Levantar en local
-
-### Frontend
+## Setup (una sola vez)
 
 ```bash
-bun install
-bun run dev            # http://localhost:5173
+./setup.sh
 ```
 
-### Server
+Instala las dependencias del frontend y del server, crea `server/.env` a
+partir del ejemplo, y seedea la base. Después editá `server/.env` y
+completá `ANTHROPIC_API_KEY`.
+
+Requiere tener `bun` instalado (`curl -fsSL https://bun.sh/install | bash`).
+
+## Levantar en local
 
 ```bash
-cd server
-npm install
-cp .env.example .env   # completar ANTHROPIC_API_KEY
-npm run db:reset       # crea criteria.db y seedea usuarios + cursos + actividades
-npm run dev            # http://localhost:3001
+# terminal 1 — server
+cd server && npm run dev       # http://localhost:3001
+
+# terminal 2 — frontend
+bun run dev                    # http://localhost:5173
 ```
 
 El frontend proxya `/api` a `localhost:3001`.
