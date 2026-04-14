@@ -3,6 +3,7 @@ import { requireRole } from './auth.js';
 import { db, jsonParse, jsonStringify } from './db.js';
 import { nanoid } from 'nanoid';
 import type { CreateActivityRequest } from './contracts.js';
+import { summarizeActivity, refreshStudentProfile } from './teacher-agents.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
   // GET /api/teacher/courses → { courses: Course[] }
@@ -229,7 +230,34 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
   app.post('/activities/:id/generate-summary', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
-    reply.code(501).send({ error: 'not_implemented' });
+
+    const { id } = req.params as { id: string };
+
+    const activity = db
+      .prepare('SELECT * FROM activities WHERE id = ? AND teacher_id = ?')
+      .get(id, user.id) as any;
+
+    if (!activity) {
+      return reply.code(404).send({ error: 'activity_not_found' });
+    }
+
+    try {
+      const result = await summarizeActivity(id);
+      const summaryId = nanoid(12);
+      const now = new Date().toISOString();
+
+      db.prepare(
+        `INSERT INTO activity_summaries (id, activity_id, course_id, summary, understanding_avg, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(summaryId, result.activity_id, result.course_id, result.summary, result.understanding_avg, now);
+
+      reply.send({ id: summaryId, ...result, created_at: now });
+    } catch (err: any) {
+      if (err?.message === 'no_completed_sessions') {
+        return reply.code(400).send({ error: 'no_completed_sessions' });
+      }
+      throw err;
+    }
   });
 
   // GET /api/teacher/students/:id → TeacherStudentDetail
@@ -285,7 +313,36 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
   app.post('/students/:id/refresh-summary', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
-    reply.code(501).send({ error: 'not_implemented' });
+
+    const { id: studentId } = req.params as { id: string };
+
+    const membership = db
+      .prepare(
+        `SELECT cs.student_id FROM course_students cs
+         JOIN courses c ON c.id = cs.course_id
+         WHERE c.teacher_id = ? AND cs.student_id = ?
+         LIMIT 1`
+      )
+      .get(user.id, studentId);
+
+    if (!membership) {
+      return reply.code(404).send({ error: 'student_not_found' });
+    }
+
+    const { summary } = await refreshStudentProfile(studentId);
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `INSERT INTO student_profiles (student_id, summary, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(student_id) DO UPDATE SET summary = excluded.summary, updated_at = excluded.updated_at`
+    ).run(studentId, summary, now);
+
+    const profile = db
+      .prepare('SELECT * FROM student_profiles WHERE student_id = ?')
+      .get(studentId);
+
+    reply.send(profile);
   });
 
   // GET /api/teacher/sessions/:sessionId → StudentSessionDetail
