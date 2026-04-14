@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Play, Eye, Users, Calendar, Loader2, FileText } from "lucide-react";
+import { Play, Eye, Users, Calendar, Loader2, FileText, ChevronUp } from "lucide-react";
 import type {
   Activity,
-  ListActivitiesResponse,
   ListCoursesResponse,
   ActivitySummary,
+  ClassAnalysis,
 } from "@contracts";
 
 type Tab = "pending" | "active" | "finished";
@@ -26,6 +26,7 @@ interface ActivitiesResponse {
 
 const TeacherActivities = () => {
   const [tab, setTab] = useState<Tab>("pending");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const {
@@ -55,6 +56,14 @@ const TeacherActivities = () => {
       queryClient.invalidateQueries({ queryKey: ["teacher-activities"] });
     },
   });
+
+  const { data: activityDetail } = useQuery({
+    queryKey: ["teacher-activity-detail", expandedId],
+    queryFn: () => apiFetch<any>(`/api/teacher/activities/${expandedId}`),
+    enabled: !!expandedId,
+  });
+
+  const expandedAnalysis: ClassAnalysis | null = activityDetail?.latest_summary?.analysis ?? null;
 
   const summarizeMutation = useMutation({
     mutationFn: (activityId: string) =>
@@ -175,17 +184,35 @@ const TeacherActivities = () => {
                   )}
 
                   {tab === "active" && (
-                    <Button variant="outline" size="sm" className="mt-3">
-                      <Eye className="h-3.5 w-3.5 mr-1.5" />
-                      Ver resultados
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3"
+                      onClick={() => setExpandedId(expandedId === act.id ? null : act.id)}
+                    >
+                      {expandedId === act.id ? (
+                        <ChevronUp className="h-3.5 w-3.5 mr-1.5" />
+                      ) : (
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      {expandedId === act.id ? "Ocultar" : "Ver resultados"}
                     </Button>
                   )}
 
                   {tab === "finished" && (
                     <div className="mt-3 space-y-2">
-                      <Button variant="outline" size="sm" className="w-full">
-                        <Eye className="h-3.5 w-3.5 mr-1.5" />
-                        Ver resultados
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setExpandedId(expandedId === act.id ? null : act.id)}
+                      >
+                        {expandedId === act.id ? (
+                          <ChevronUp className="h-3.5 w-3.5 mr-1.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        {expandedId === act.id ? "Ocultar" : "Ver resultados"}
                       </Button>
                       <Button
                         variant="outline"
@@ -205,6 +232,51 @@ const TeacherActivities = () => {
                   )}
                 </div>
               </div>
+
+              {expandedId === act.id && expandedAnalysis && (
+                <div className="mt-4 border-t border-border pt-4 space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-muted/50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-serif text-primary">{Math.round(expandedAnalysis.class_comprehension_avg)}%</p>
+                      <p className="text-xs text-muted-foreground font-body">comprensión</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-serif">{expandedAnalysis.difficult_topics?.length ?? 0}</p>
+                      <p className="text-xs text-muted-foreground font-body">temas difíciles</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-3 text-center">
+                      <p className="text-2xl font-serif">{expandedAnalysis.struggling_students?.length ?? 0}</p>
+                      <p className="text-xs text-muted-foreground font-body">necesitan ayuda</p>
+                    </div>
+                  </div>
+
+                  {expandedAnalysis.class_summary && (
+                    <p className="text-sm font-body text-muted-foreground leading-relaxed">{expandedAnalysis.class_summary}</p>
+                  )}
+
+                  {expandedAnalysis.difficult_topics && expandedAnalysis.difficult_topics.length > 0 && (
+                    <div>
+                      <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mb-2">Temas difíciles</p>
+                      <div className="flex flex-wrap gap-2">
+                        {expandedAnalysis.difficult_topics.map((t: any, i: number) => (
+                          <span key={i} className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded font-body">
+                            {t.topic} ({t.student_count})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {expandedAnalysis.suggested_plan && (
+                    <div>
+                      <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mb-2">Plan sugerido</p>
+                      <div className="bg-muted/50 rounded-lg p-4 text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap">
+                        {expandedAnalysis.suggested_plan}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
