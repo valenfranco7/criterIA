@@ -199,8 +199,9 @@ insertActivity.run(
 const insertSession = db.prepare(
   `INSERT INTO activity_sessions
      (id, activity_id, student_id, status, current_phase, phase_turn_count,
-      started_at, completed_at, session_summary, teacher_report, extracted_ideas)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      started_at, completed_at, session_summary, teacher_report, extracted_ideas,
+      managed_session_id, comprehension_pct, difficult_topics)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 );
 
 const insertMessage = db.prepare(
@@ -231,7 +232,10 @@ insertSession.run(
   daysAgo(13, 9, 28),
   'Sofía llegó rápidamente a la idea de excedente agrícola como condición necesaria y la articuló con la división del trabajo usando una analogía de anillos concéntricos. Mostró capacidad para conectar causas sin que el tutor se las enumerara.',
   `## Informe de sesión — Sofía Martínez\n\n### Fortalezas\n- Construyó la cadena causal (excedente → especialización → ciudad) de forma autónoma.\n- Usó analogías espaciales originales que evidencian pensamiento relacional.\n- Respondió a las preguntas de cierre con síntesis precisas y sin apoyo.\n\n### Áreas de mejora\n- Tendencia a generalizar: no exploró excepciones (ciudades sin agricultura intensa).\n- Conviene invitarla a buscar contraejemplos antes de cerrar conclusiones.`,
-  JSON.stringify(['El excedente agrícola permitió que no todos tuvieran que producir alimentos', 'La especialización crea interdependencia que hace que vivir juntos sea más conveniente'])
+  JSON.stringify(['El excedente agrícola permitió que no todos tuvieran que producir alimentos', 'La especialización crea interdependencia que hace que vivir juntos sea más conveniente']),
+  null,
+  85,
+  '[]'
 );
 
 {
@@ -262,7 +266,10 @@ insertSession.run(
   daysAgo(13, 10, 35),
   'Mateo arrancó con respuestas cortas y esquivas hasta que el tutor lo ancló en su propio barrio. A partir de ese momento construyó el argumento paso a paso y llegó a identificar el excedente y la defensa colectiva como factores clave.',
   `## Informe de sesión — Mateo López\n\n### Fortalezas\n- Una vez anclado en lo concreto, razonó con solidez y sin apresuramiento.\n- Identificó espontáneamente la defensa como motivación para agruparse, factor que otros alumnos no mencionaron.\n- Sus conclusiones finales fueron matizadas y consideraron más de un factor.\n\n### Áreas de mejora\n- Necesita andamiaje concreto para iniciar: preguntas abiertas sin contexto lo bloquean.\n- Conviene comenzar siempre desde un ejemplo cercano antes de escalar a lo histórico.`,
-  JSON.stringify(['Vivir juntos también servía para defenderse, no solo para trabajar mejor', 'El excedente de comida es la condición previa sin la cual nada más puede pasar'])
+  JSON.stringify(['Vivir juntos también servía para defenderse, no solo para trabajar mejor', 'El excedente de comida es la condición previa sin la cual nada más puede pasar']),
+  null,
+  45,
+  '["excedente agrícola","división del trabajo"]'
 );
 
 {
@@ -293,7 +300,10 @@ insertSession.run(
   daysAgo(13, 11, 20),
   'Valentina alcanzó la síntesis en pocas intervenciones, anticipando los conceptos de excedente y división del trabajo antes de que el tutor los sugiriera. La sesión fue breve pero demostró comprensión cabal del tema.',
   `## Informe de sesión — Valentina García\n\n### Fortalezas\n- Capacidad de síntesis muy por encima del promedio: llegó sola al modelo causal completo.\n- Formuló la conclusión en términos generales aplicables a cualquier sociedad, no solo a la antigua.\n- Ritmo de trabajo eficiente; no necesita muchos turnos para consolidar.\n\n### Áreas de mejora\n- La rapidez puede esconder supuestos no revisados; vale la pena pedirle que justifique cada paso.\n- Podría beneficiarse de problemas más desafiantes o casos históricos que rompan el modelo simple.`,
-  JSON.stringify(['La ciudad es posible cuando la producción supera la subsistencia individual', 'La especialización y la ciudad se retroalimentan mutuamente'])
+  JSON.stringify(['La ciudad es posible cuando la producción supera la subsistencia individual', 'La especialización y la ciudad se retroalimentan mutuamente']),
+  null,
+  92,
+  '[]'
 );
 
 {
@@ -326,7 +336,10 @@ insertSession.run(
   daysAgo(9, 9, 30),
   'Sofía conectó rápidamente la participación con la posibilidad de cambiar reglas y exploró la tensión entre participar dentro de las reglas y cuestionarlas. Llegó a una noción de participación como práctica transformadora.',
   `## Informe de sesión — Sofía Martínez\n\n### Fortalezas\n- Distinguió con claridad entre cumplir reglas y tener poder para cambiarlas.\n- Usó el ejemplo del reglamento escolar de forma pertinente y lo generalizó bien.\n- Mostró disposición para sostener posturas incómodas bajo presión socrática.\n\n### Áreas de mejora\n- Tiende a ver la participación en términos optimistas; conviene desafiarla con casos donde participar no cambia nada.\n- Podría profundizar en condiciones estructurales que limitan la participación real.`,
-  JSON.stringify(['Participar no es solo opinar, es incidir en las decisiones', 'Para cambiar una regla también hay que participar dentro del sistema, aunque la regla te parezca injusta'])
+  JSON.stringify(['Participar no es solo opinar, es incidir en las decisiones', 'Para cambiar una regla también hay que participar dentro del sistema, aunque la regla te parezca injusta']),
+  null,
+  88,
+  '["participación desde afuera del sistema"]'
 );
 
 {
@@ -357,7 +370,10 @@ insertSession.run(
   daysAgo(9, 10, 40),
   'Mateo mostró resistencia inicial al tema, argumentando que participar "no sirve para nada". Tras explorar ejemplos concretos de su entorno, tuvo un quiebre conceptual y reconoció la participación como herramienta real aunque imperfecta.',
   `## Informe de sesión — Mateo López\n\n### Fortalezas\n- La resistencia inicial fue productiva: cuando la trabó, su razonamiento se volvió más sólido.\n- Reconoció espontáneamente que su escepticismo era también una forma de posicionarse políticamente.\n- La conclusión final fue honesta y matizada: valora la participación sin idealizarla.\n\n### Áreas de mejora\n- El escepticismo puede volverse un escudo; conviene desafiarlo con ejemplos de participación exitosa.\n- Necesita más ejemplos históricos para ver que la participación tiene antecedentes concretos de éxito.`,
-  JSON.stringify(['No participar también es una decisión, y tiene consecuencias', 'La participación puede no cambiar todo, pero sin ella las cosas cambian sin vos'])
+  JSON.stringify(['No participar también es una decisión, y tiene consecuencias', 'La participación puede no cambiar todo, pero sin ella las cosas cambian sin vos']),
+  null,
+  48,
+  '["condiciones estructurales que limitan la participación","ejemplos históricos de participación exitosa"]'
 );
 
 {
@@ -380,19 +396,22 @@ insertSession.run(
 // SESSIONS — act-revolucion (active)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ── sess-sofia-rev (in_progress / exploration) ────────────────────────────────
+// ── sess-sofia-rev (completed / exploration) ──────────────────────────────────
 insertSession.run(
   'sess-sofia-rev',
   'act-revolucion',
   'sofiam',
-  'in_progress',
+  'completed',
   'exploration',
   2,
   daysAgo(1, 14, 0),
+  daysAgo(1, 14, 20),
+  'Sofía identificó la asimetría económica entre Buenos Aires y el interior como eje central de los conflictos de 1810, destacando el rol del puerto como fuente de poder.',
   null,
+  JSON.stringify([]),
   null,
-  null,
-  JSON.stringify([])
+  82,
+  '["rol del Cabildo","intereses del interior"]'
 );
 
 {
@@ -419,22 +438,28 @@ insertSession.run(
   null,
   null,
   null,
-  JSON.stringify([])
+  JSON.stringify([]),
+  null,
+  0,
+  '[]'
 );
 
-// ── sess-vale-rev (in_progress / tension) ─────────────────────────────────────
+// ── sess-vale-rev (completed / tension) ───────────────────────────────────────
 insertSession.run(
   'sess-vale-rev',
   'act-revolucion',
   'valentinag',
-  'in_progress',
+  'completed',
   'tension',
   3,
   daysAgo(1, 15, 0),
+  daysAgo(1, 15, 25),
+  'Valentina analizó la tensión entre Buenos Aires y el interior con profundidad, cuestionando por qué el interior participó en la revolución si Buenos Aires iba a concentrar el poder.',
   null,
+  JSON.stringify([]),
   null,
-  null,
-  JSON.stringify([])
+  90,
+  '["distribución del poder post-revolución"]'
 );
 
 {
@@ -463,7 +488,10 @@ insertSession.run(
   null,
   null,
   null,
-  JSON.stringify([])
+  JSON.stringify([]),
+  null,
+  0,
+  '[]'
 );
 
 // ── sess-camila-rev (completed) ───────────────────────────────────────────────
@@ -478,7 +506,10 @@ insertSession.run(
   daysAgo(2, 9, 32),
   'Camila identificó con claridad la tensión entre Buenos Aires y el interior, relacionando el control del puerto con el poder político. Pudo articular que los distintos grupos tenían proyectos de país incompatibles.',
   `## Informe de sesión — Camila Fernández\n\n### Fortalezas\n- Conectó economía y política sin que el tutor lo sugiriera explícitamente.\n- Usó vocabulario histórico preciso (libre comercio, virreinato, autonomía).\n- La síntesis final fue clara y mostró comprensión de múltiples perspectivas.\n\n### Áreas de mejora\n- Podría profundizar en las voces del interior: tendió a describir el conflicto desde la perspectiva de Buenos Aires.\n- Vale explorar con ella qué pasó después de 1810 para ver si sus hipótesis se sostienen.`,
-  JSON.stringify(['El control del puerto era control del flujo económico del virreinato', 'La revolución no resolvió la tensión entre Buenos Aires y el interior, solo cambió quién mandaba'])
+  JSON.stringify(['El control del puerto era control del flujo económico del virreinato', 'La revolución no resolvió la tensión entre Buenos Aires y el interior, solo cambió quién mandaba']),
+  null,
+  65,
+  '["perspectiva del interior en 1810"]'
 );
 
 {
@@ -509,7 +540,10 @@ insertSession.run(
   null,
   null,
   null,
-  JSON.stringify([])
+  JSON.stringify([]),
+  null,
+  0,
+  '[]'
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
