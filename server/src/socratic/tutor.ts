@@ -12,7 +12,7 @@ export interface TutorInput {
   recent_history: Array<{ role: 'student' | 'assistant'; content: string }>;
   student_message: string;
   analyzer_notes: AnalyzerOutput;
-  activity_config: {
+  activity_config?: {
     initial_question?: string;
     success_criteria?: string;
     agent_tone?: string;
@@ -30,19 +30,21 @@ export async function runTutor(input: TutorInput): Promise<string> {
 
   const phaseContext = `\n\n## Contexto de esta sesión\n\nFase actual: **${input.current_phase}**\n\nSeñales del analyzer (orientativas, no mandatorias):\n- resistance_level: ${input.analyzer_notes.resistance_level}/3\n- blockage_level: ${input.analyzer_notes.blockage_level}/3\n- phase_action sugerido: ${input.analyzer_notes.phase_action}\n\nSi el mensaje literal del alumno no confirma estas señales, ignoralas y respondé al texto.`;
 
-  const configContext = [
-    input.activity_config.success_criteria
-      ? `\nCriterio de éxito de esta actividad: ${input.activity_config.success_criteria}`
-      : '',
-    input.activity_config.agent_tone
-      ? `\nTono sugerido por el docente: ${input.activity_config.agent_tone}`
-      : '',
-    input.activity_config.reference_material
-      ? `\nMaterial de referencia: ${input.activity_config.reference_material}`
-      : '',
-  ]
-    .filter(Boolean)
-    .join('');
+  const configContext = input.activity_config
+    ? [
+        input.activity_config.success_criteria
+          ? `\nCriterio de éxito de esta actividad: ${input.activity_config.success_criteria}`
+          : '',
+        input.activity_config.agent_tone
+          ? `\nTono sugerido por el docente: ${input.activity_config.agent_tone}`
+          : '',
+        input.activity_config.reference_material
+          ? `\nMaterial de referencia: ${input.activity_config.reference_material}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('')
+    : '';
 
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
     ...input.recent_history.map((m) => ({
@@ -66,6 +68,10 @@ export async function runTutor(input: TutorInput): Promise<string> {
     messages,
   });
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  return text.trim();
+  const first = response.content[0];
+  if (!first || first.type !== 'text') {
+    console.error('[Tutor] Unexpected response content type:', first?.type);
+    throw new Error('Tutor did not return a text response');
+  }
+  return first.text.trim();
 }
