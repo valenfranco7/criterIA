@@ -1,97 +1,253 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { socraticChat } from "@/data/mockData";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Pause, PanelRightOpen, PanelRightClose, ArrowLeft } from "lucide-react";
-
-const builtIdeas = [
-  "La exclusión política era permanente para los criollos — no podían cambiar dónde nacieron",
-  "Cuando el sistema no tiene forma de incluir a los que excluye, la presión crece hasta que se rompe",
-];
+import { ArrowLeft } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import type {
+  ListStudentActivitiesResponse,
+  StudentSessionDetail,
+  SessionTurnResponse,
+  CloseSessionResponse,
+  Message,
+  Activity,
+  ActivitySession,
+} from "@contracts";
 
 const SocraticChat = () => {
   const navigate = useNavigate();
-  const [messages] = useState(socraticChat);
+  const { activityId } = useParams<{ activityId: string }>();
+
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [session, setSession] = useState<ActivitySession | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [showIdeas, setShowIdeas] = useState(true);
-  const [elapsed] = useState("12:34");
+  const [thinking, setThinking] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // On mount: load or start session
+  useEffect(() => {
+    if (!activityId) return;
+
+    async function init() {
+      try {
+        // Find the activity + existing session
+        const list = await apiFetch<ListStudentActivitiesResponse>('/api/student/activities');
+        const item = list.items.find((i) => i.activity.id === activityId);
+
+        if (!item) {
+          setError("Actividad no encontrada.");
+          setLoading(false);
+          return;
+        }
+
+        setActivity(item.activity);
+
+        if (item.session && item.session.status !== 'not_started') {
+          // Load existing session with messages
+          const detail = await apiFetch<StudentSessionDetail>(
+            `/api/student/sessions/${item.session.id}`
+          );
+          setSession(detail.session);
+          setMessages(detail.messages.filter((m) => m.role !== 'system'));
+        } else {
+          // Start a new session
+          const started = await apiFetch<{ session: ActivitySession }>(
+            `/api/student/activities/${activityId}/start`,
+            { method: 'POST' }
+          );
+          setSession(started.session);
+          // Fetch messages after start
+          const detail = await apiFetch<StudentSessionDetail>(
+            `/api/student/sessions/${started.session.id}`
+          );
+          setMessages(detail.messages.filter((m) => m.role !== 'system'));
+        }
+      } catch (e) {
+        setError("Error al cargar la actividad.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    init();
+  }, [activityId]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, thinking]);
+
+  const handleSend = async () => {
+    if (!input.trim() || thinking || !session) return;
+
+    const text = input.trim();
+    setInput("");
+    setThinking(true);
+
+    // Optimistically add student message to UI
+    const tempStudentMsg: Message = {
+      id: `temp-${Date.now()}`,
+      session_id: session.id,
+      turn_index: messages.length,
+      role: "student",
+      content: text,
+      phase_at_turn: session.current_phase,
+      analyzer_json: null,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempStudentMsg]);
+
+    try {
+      const result = await apiFetch<SessionTurnResponse>(
+        `/api/student/sessions/${session.id}/messages`,
+        { method: 'POST', body: { content: text } }
+      );
+      // Replace temp message with real ones from server
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== tempStudentMsg.id),
+        result.user_message,
+        result.assistant_message,
+      ]);
+      setSession(result.session);
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== tempStudentMsg.id));
+      setError("Error al enviar el mensaje. Intentá de nuevo.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const handleClose = async () => {
+    if (!session || closing) return;
+    setClosing(true);
+    try {
+      await apiFetch<CloseSessionResponse>(
+        `/api/student/sessions/${session.id}/close`,
+        { method: 'POST' }
+      );
+      navigate("/estudiante/conversaciones");
+    } catch {
+      setError("Error al cerrar la sesión.");
+      setClosing(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (error && !session) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <p className="text-sm text-destructive font-body">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/estudiante/actividades")} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => navigate("/estudiante/actividades")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <p className="text-sm font-body font-medium">La Revolución de Mayo desde tu mirada</p>
-            <p className="text-xs text-muted-foreground font-body">Historia 3ro A</p>
+            <p className="text-sm font-body font-medium">
+              {activity?.title ?? "Actividad"}
+            </p>
+            <p className="text-xs text-muted-foreground font-body capitalize">
+              {session?.current_phase ?? ""}
+            </p>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground font-body">{elapsed}</span>
-          <Button variant="outline" size="sm">
-            <Pause className="h-3.5 w-3.5 mr-1.5" />
-            Pausar
-          </Button>
-          <button onClick={() => setShowIdeas(!showIdeas)} className="text-muted-foreground hover:text-foreground transition-colors">
-            {showIdeas ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-          </button>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Chat area */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-auto p-6 space-y-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "student" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[70%] px-4 py-3 rounded-lg text-sm font-body leading-relaxed ${
+      {/* Chat area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto p-6 space-y-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === "student" ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[70%] px-4 py-3 rounded-lg text-sm font-body leading-relaxed ${
                   msg.role === "student"
                     ? "bg-primary text-primary-foreground"
                     : "bg-card border border-border text-foreground"
-                }`}>
-                  {msg.text}
-                </div>
+                }`}
+              >
+                {msg.content}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
 
-          <div className="p-4 border-t border-border">
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Escribí tu respuesta..."
-                className="flex-1 px-4 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <Button>Enviar</Button>
+          {thinking && (
+            <div className="flex justify-start">
+              <div className="px-4 py-3 rounded-lg bg-card border border-border text-sm font-body text-muted-foreground">
+                <span className="inline-flex gap-1">
+                  <span className="animate-bounce [animation-delay:0ms]">·</span>
+                  <span className="animate-bounce [animation-delay:150ms]">·</span>
+                  <span className="animate-bounce [animation-delay:300ms]">·</span>
+                </span>
+              </div>
             </div>
-            <div className="flex justify-center mt-3">
-              <Button variant="outline" size="sm" className="text-xs">
-                Cerrar actividad
-              </Button>
-            </div>
-          </div>
+          )}
+
+          {error && (
+            <p className="text-xs text-destructive text-center font-body">{error}</p>
+          )}
+
+          <div ref={bottomRef} />
         </div>
 
-        {/* Ideas panel */}
-        {showIdeas && (
-          <div className="w-72 border-l border-border bg-card p-5 overflow-auto animate-fade-in">
-            <h3 className="font-serif text-sm text-muted-foreground mb-4">Ideas que vas construyendo</h3>
-            <div className="space-y-3">
-              {builtIdeas.map((idea, i) => (
-                <div key={i} className="p-3 rounded-md bg-muted text-sm font-body leading-relaxed">
-                  {idea}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground font-body mt-6 italic">
-              Estas son tus ideas, formuladas con tus palabras.
-            </p>
+        <div className="p-4 border-t border-border">
+          <div className="flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Escribí tu respuesta..."
+              disabled={thinking || session?.status === 'completed'}
+              className="flex-1 px-4 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+            />
+            <Button onClick={handleSend} disabled={thinking || !input.trim() || session?.status === 'completed'}>
+              Enviar
+            </Button>
           </div>
-        )}
+          {session?.status !== 'completed' && (
+            <div className="flex justify-center mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={handleClose}
+                disabled={closing || thinking}
+              >
+                {closing ? "Cerrando..." : "Cerrar actividad"}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
