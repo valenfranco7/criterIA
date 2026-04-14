@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, X, Calendar } from "lucide-react";
+import { Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -40,15 +41,10 @@ interface StudentsResponse {
   students: Student[];
 }
 
-interface CourseDetailResponse {
-  course: Course;
-  students: Student[];
-}
-
 const TeacherCourses = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [yearLevel, setYearLevel] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
@@ -59,12 +55,6 @@ const TeacherCourses = () => {
   const { data, isLoading, isError } = useQuery<CoursesResponse>({
     queryKey: ["teacher-courses"],
     queryFn: () => apiFetch("/api/teacher/courses"),
-  });
-
-  const { data: courseDetail, isLoading: courseDetailLoading } = useQuery<CourseDetailResponse>({
-    queryKey: ["course-detail", selectedCourseId],
-    queryFn: () => apiFetch(`/api/teacher/courses/${selectedCourseId}`),
-    enabled: !!selectedCourseId,
   });
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery<StudentsResponse>({
@@ -235,12 +225,11 @@ const TeacherCourses = () => {
       ) : isError ? (
         <p className="text-sm text-destructive">No se pudieron cargar los cursos. Intentá de nuevo.</p>
       ) : (
-        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(data?.courses ?? []).map((course) => (
             <button
               key={course.id}
-              onClick={() => setSelectedCourseId(course.id)}
+              onClick={() => navigate(`/profesor/alumnos?curso=${course.id}`)}
               className="text-left bg-card border border-border rounded-lg p-6 hover:border-primary/30 hover:shadow-sm transition-all group"
             >
               <h3 className="font-serif text-lg group-hover:text-primary transition-colors">
@@ -262,81 +251,6 @@ const TeacherCourses = () => {
             </p>
           )}
         </div>
-
-        {/* Course detail modal */}
-        {selectedCourseId && (
-          <div
-            className="fixed inset-0 bg-foreground/20 flex items-center justify-center z-50"
-            onClick={() => setSelectedCourseId(null)}
-          >
-            <div
-              className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 animate-fade-in"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-start mb-4">
-                {courseDetailLoading ? (
-                  <p className="text-sm text-muted-foreground font-body">Cargando...</p>
-                ) : (
-                  <div>
-                    <h3 className="font-serif text-xl">{courseDetail?.course.name}</h3>
-                    <p className="text-sm text-muted-foreground font-body mt-0.5">
-                      {courseDetail?.course.year_or_level}
-                    </p>
-                  </div>
-                )}
-                <button
-                  onClick={() => setSelectedCourseId(null)}
-                  className="text-muted-foreground hover:text-foreground ml-4 flex-shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {!courseDetailLoading && courseDetail && (
-                <>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-body mb-5">
-                    <Calendar className="h-3 w-3" />
-                    Creado el{" "}
-                    {new Date(courseDetail.course.created_at).toLocaleDateString("es-AR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-3">
-                      Alumnos ({courseDetail.students.length})
-                    </p>
-                    {courseDetail.students.length === 0 ? (
-                      <p className="text-sm text-muted-foreground font-body italic">
-                        Sin alumnos inscriptos.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {courseDetail.students.map((s) => (
-                          <div
-                            key={s.id}
-                            className="flex items-center gap-3 py-2 border-b border-border last:border-0"
-                          >
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium flex-shrink-0">
-                              {s.avatar_initials ?? s.name.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-body">{s.name}</p>
-                              <p className="text-xs text-muted-foreground font-body">@{s.id}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        </>
       )}
     </div>
   );
