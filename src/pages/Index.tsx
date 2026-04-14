@@ -1,8 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { setUserId } from "@/lib/api";
 
 const Index = () => {
   const navigate = useNavigate();
+
+  const enterAsTeacher = () => {
+    setUserId("yairp");
+    navigate("/profesor");
+  };
+
+  const enterAsStudent = () => {
+    setUserId("sofiam");
+    navigate("/estudiante");
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -42,18 +53,18 @@ const Index = () => {
         <div className="flex flex-col sm:flex-row gap-4">
           <Button
             size="lg"
-            onClick={() => navigate("/profesor")}
+            onClick={enterAsTeacher}
             className="text-base px-10 py-6 font-body bg-foreground text-background hover:bg-foreground/90"
           >
-            Entrar como profesor
+            Entrar como Yair (profesor)
           </Button>
           <Button
             variant="outline"
             size="lg"
-            onClick={() => navigate("/estudiante")}
+            onClick={enterAsStudent}
             className="text-base px-10 py-6 font-body border-border hover:bg-accent"
           >
-            Entrar como estudiante
+            Entrar como Sofía (alumna)
           </Button>
         </div>
       </div>
