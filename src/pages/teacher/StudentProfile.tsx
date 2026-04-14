@@ -161,6 +161,29 @@ const StudentProfile = () => {
 
                 {isExpanded && (
                   <div className="border-t border-border animate-fade-in">
+                    {/* Comprehension & difficult topics */}
+                    <div className="flex items-center gap-3 mt-2 flex-wrap px-4 pt-3">
+                      {(sess as any).comprehension_pct != null && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-body font-medium ${
+                          (sess as any).comprehension_pct >= 70
+                            ? "bg-green-50 text-green-700"
+                            : (sess as any).comprehension_pct >= 40
+                            ? "bg-yellow-50 text-yellow-700"
+                            : "bg-red-50 text-red-700"
+                        }`}>
+                          {(sess as any).comprehension_pct}% comprensión
+                        </span>
+                      )}
+                      {Array.isArray((sess as any).difficult_topics) && (sess as any).difficult_topics.length > 0 && (
+                        <>
+                          {((sess as any).difficult_topics as string[]).map((topic: string, i: number) => (
+                            <span key={i} className="text-xs bg-muted px-2 py-0.5 rounded font-body text-muted-foreground">
+                              {topic}
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </div>
                     {/* Tabs */}
                     <div className="flex border-b border-border">
                       <button
