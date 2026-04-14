@@ -1,6 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, FileText, Activity, Users, LogOut } from "lucide-react";
-import { UserSwitcher } from "@/components/UserSwitcher";
 
 const navItems = [
   { label: "Mis cursos", path: "/profesor/cursos", icon: BookOpen },
@@ -54,7 +53,6 @@ const TeacherLayout = () => {
         </nav>
 
         <div className="p-4 border-t border-border space-y-2">
-          <UserSwitcher />
           <button
             onClick={() => navigate("/")}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground font-body transition-colors"
