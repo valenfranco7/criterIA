@@ -215,18 +215,22 @@ const TeacherActivities = () => {
                         {expandedId === act.id ? "Ocultar" : "Ver resultados"}
                       </Button>
                       <Button
-                        variant="outline"
+                        variant={isSummarizing ? "default" : "outline"}
                         size="sm"
                         className="w-full"
                         disabled={isSummarizing}
-                        onClick={() => summarizeMutation.mutate(act.id)}
+                        onClick={() => {
+                          summarizeMutation.mutate(act.id, {
+                            onSuccess: () => setExpandedId(act.id),
+                          });
+                        }}
                       >
                         {isSummarizing ? (
                           <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                         ) : (
                           <FileText className="h-3.5 w-3.5 mr-1.5" />
                         )}
-                        Generar resumen
+                        {isSummarizing ? "Generando análisis..." : "Generar resumen"}
                       </Button>
                     </div>
                   )}
