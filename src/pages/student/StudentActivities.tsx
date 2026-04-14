@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { activities } from "@/data/mockData";
+import { apiFetch } from "@/lib/api";
+import type { ListStudentActivitiesResponse, Activity, ActivitySession } from "@contracts";
 
 type Tab = "pending" | "active" | "completed";
+
+type Item = { activity: Activity; session: ActivitySession | null };
 
 const StudentActivities = () => {
   const [tab, setTab] = useState<Tab>("pending");
   const navigate = useNavigate();
+  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<ListStudentActivitiesResponse>('/api/student/activities')
+      .then((data) => setAllItems(data.items))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "pending", label: "Pendientes" },
@@ -14,7 +26,11 @@ const StudentActivities = () => {
     { key: "completed", label: "Completadas" },
   ];
 
-  const items = tab === "pending" ? activities.pending : tab === "active" ? activities.active : activities.finished;
+  const filtered = allItems.filter(({ session }) => {
+    if (tab === "pending") return !session || session.status === "not_started";
+    if (tab === "active") return session?.status === "in_progress";
+    return session?.status === "completed";
+  });
 
   return (
     <div className="p-8 animate-fade-in">
@@ -34,22 +50,30 @@ const StudentActivities = () => {
         ))}
       </div>
 
-      <div className="space-y-3 max-w-2xl">
-        {items.map((act) => (
-          <button
-            key={act.id}
-            onClick={() => tab !== "completed" ? navigate(`/estudiante/actividad/${act.id}`) : undefined}
-            className="w-full text-left bg-card border border-border rounded-lg p-5 hover:border-primary/30 transition-all"
-          >
-            <h3 className="font-serif text-base">{act.title}</h3>
-            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-body">
-              <span>{act.course}</span>
-              <span>{act.datePlanned}</span>
-              <span>{act.duration}</span>
-            </div>
-          </button>
-        ))}
-      </div>
+      {loading ? (
+        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+      ) : (
+        <div className="space-y-3 max-w-2xl">
+          {filtered.length === 0 && (
+            <p className="text-sm text-muted-foreground font-body">No hay actividades en esta categoría.</p>
+          )}
+          {filtered.map(({ activity, session }) => (
+            <button
+              key={activity.id}
+              onClick={() => navigate(`/estudiante/actividad/${activity.id}`)}
+              className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/30 transition-all"
+            >
+              <p className="text-sm font-body font-medium">{activity.title}</p>
+              <p className="text-xs text-muted-foreground font-body mt-1">{activity.topic}</p>
+              {session?.status === "in_progress" && (
+                <span className="inline-block mt-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-body">
+                  En curso
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
