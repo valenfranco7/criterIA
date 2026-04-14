@@ -28,25 +28,25 @@ const Index = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-6">
         {/* Small label above tagline */}
         <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground font-body mb-8">
-          Plataforma Educativa
+          Educational Platform
         </p>
 
         {/* Large centered tagline */}
         <h1 className="text-center max-w-4xl">
           <span className="block text-5xl md:text-7xl lg:text-8xl font-serif font-light tracking-tight text-foreground leading-[1.1]">
-            El conocimiento
+            Knowledge
           </span>
           <span className="block text-5xl md:text-7xl lg:text-8xl font-serif font-light tracking-tight text-foreground leading-[1.1]">
-            no se transmite,
+            is not transmitted,
           </span>
           <span className="block text-5xl md:text-7xl lg:text-8xl font-serif italic text-primary leading-[1.1] mt-2">
-            se descubre.
+            it is discovered.
           </span>
         </h1>
 
         {/* Subtitle */}
         <p className="text-lg md:text-xl text-muted-foreground font-body mt-12 mb-16 max-w-2xl text-center leading-relaxed">
-          Una herramienta para profesores que planifican con intención y alumnos que piensan por sí mismos.
+          A tool for teachers who plan with intention and students who think for themselves.
         </p>
 
         {/* Buttons */}
@@ -56,7 +56,7 @@ const Index = () => {
             onClick={enterAsTeacher}
             className="text-base px-10 py-6 font-body bg-foreground text-background hover:bg-foreground/90"
           >
-            Entrar como profesor
+            Enter as teacher
           </Button>
           <Button
             variant="outline"
@@ -64,7 +64,7 @@ const Index = () => {
             onClick={enterAsStudent}
             className="text-base px-10 py-6 font-body border-border hover:bg-accent"
           >
-            Entrar como estudiante
+            Enter as student
           </Button>
         </div>
       </div>

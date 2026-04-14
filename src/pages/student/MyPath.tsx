@@ -57,13 +57,13 @@ const MyPath = () => {
   return (
     <div className="p-8 animate-fade-in">
       <div className="max-w-3xl">
-        <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-1">Tu recorrido</p>
+        <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-1">Your journey</p>
         <h2 className="text-2xl font-serif mb-1">
           {totalIdeas > 0
-            ? `Descubriste ${totalIdeas} idea${totalIdeas !== 1 ? 's' : ''}`
-            : "Todavía no hay ideas"}
+            ? `You discovered ${totalIdeas} idea${totalIdeas !== 1 ? 's' : ''}`
+            : "No ideas yet"}
         </h2>
-        <p className="text-sm text-muted-foreground font-body italic mb-6">Esto es tuyo. Lo pensaste vos.</p>
+        <p className="text-sm text-muted-foreground font-body italic mb-6">This is yours. You thought of it.</p>
       </div>
 
       {/* Course tabs */}
@@ -92,12 +92,12 @@ const MyPath = () => {
       >
         {loadingIdeas ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground font-body">Cargando ideas...</p>
+            <p className="text-sm text-muted-foreground font-body">Loading ideas...</p>
           </div>
         ) : ideas.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <p className="text-sm text-muted-foreground font-body italic">
-              Todavía no hay ideas en esta materia.
+              No ideas in this subject yet.
             </p>
           </div>
         ) : (
@@ -157,7 +157,7 @@ const MyPath = () => {
           </div>
           {selectedIdea.question_that_triggered_it && (
             <p className="text-xs text-muted-foreground font-body italic mt-3">
-              Disparada por: "{selectedIdea.question_that_triggered_it}"
+              Triggered by: "{selectedIdea.question_that_triggered_it}"
             </p>
           )}
         </div>

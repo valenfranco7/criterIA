@@ -55,10 +55,10 @@ const StudentProfile = () => {
           className="flex items-center gap-2 text-sm text-muted-foreground font-body hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="h-4 w-4" />
-          Volver al panel
+          Back to panel
         </button>
         <p className="text-sm font-body text-muted-foreground">
-          No se pudo cargar el perfil del alumno. Intentá de nuevo más tarde.
+          Could not load the student profile. Please try again later.
         </p>
       </div>
     );
@@ -78,7 +78,7 @@ const StudentProfile = () => {
         className="flex items-center gap-2 text-sm text-muted-foreground font-body hover:text-foreground transition-colors mb-6"
       >
         <ArrowLeft className="h-4 w-4" />
-        Volver al panel
+        Back to panel
       </button>
 
       {/* Avatar + name */}
@@ -92,7 +92,7 @@ const StudentProfile = () => {
       {/* AI Summary card */}
       <div className="bg-card border border-border rounded-lg p-6 mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="font-serif text-sm text-muted-foreground">Resumen del alumno</h3>
+          <h3 className="font-serif text-sm text-muted-foreground">Student summary</h3>
           <Button
             variant="ghost"
             size="sm"
@@ -105,23 +105,23 @@ const StudentProfile = () => {
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
-            Actualizar resumen
+            Refresh summary
           </Button>
         </div>
         {profile?.summary ? (
           <p className="text-sm font-body leading-relaxed">{profile.summary}</p>
         ) : (
           <p className="text-sm font-body leading-relaxed text-muted-foreground italic">
-            Todavía no hay un resumen generado para este alumno. Hacé clic en "Actualizar resumen" para generarlo.
+            No summary has been generated for this student yet. Click "Refresh summary" to generate one.
           </p>
         )}
       </div>
 
       {/* Activity history */}
-      <h3 className="font-serif text-lg mb-4">Historial de actividades</h3>
+      <h3 className="font-serif text-lg mb-4">Activity history</h3>
       {completedSessions.length === 0 ? (
         <p className="text-sm font-body text-muted-foreground">
-          Este alumno aún no completó ninguna actividad.
+          This student has not completed any activities yet.
         </p>
       ) : (
         <div className="space-y-3">
@@ -144,12 +144,12 @@ const StudentProfile = () => {
                     <p className="text-sm font-body font-medium">{sess.activity_title}</p>
                     <p className="text-xs text-muted-foreground font-body">
                       {sess.completed_at
-                        ? new Date(sess.completed_at).toLocaleDateString("es-AR", {
+                        ? new Date(sess.completed_at).toLocaleDateString("en-US", {
                             day: "2-digit",
                             month: "long",
                             year: "numeric",
                           })
-                        : "Fecha desconocida"}
+                        : "Unknown date"}
                     </p>
                   </div>
                   {isExpanded ? (
@@ -171,7 +171,7 @@ const StudentProfile = () => {
                             ? "bg-yellow-50 text-yellow-700"
                             : "bg-red-50 text-red-700"
                         }`}>
-                          {(sess as any).comprehension_pct}% comprensión
+                          {(sess as any).comprehension_pct}% comprehension
                         </span>
                       )}
                       {Array.isArray((sess as any).difficult_topics) && (sess as any).difficult_topics.length > 0 && (
@@ -194,7 +194,7 @@ const StudentProfile = () => {
                             : "text-muted-foreground"
                         }`}
                       >
-                        Resumen
+                        Summary
                       </button>
                       <button
                         onClick={() => setActiveTab("chat")}
@@ -204,7 +204,7 @@ const StudentProfile = () => {
                             : "text-muted-foreground"
                         }`}
                       >
-                        Conversación completa
+                        Full conversation
                       </button>
                     </div>
 
@@ -212,7 +212,7 @@ const StudentProfile = () => {
                       {activeTab === "summary" ? (
                         <p className="text-sm font-body leading-relaxed text-muted-foreground">
                           {sess.teacher_report || sess.session_summary || (
-                            <span className="italic">No hay resumen disponible para esta sesión.</span>
+                            <span className="italic">No summary available for this session.</span>
                           )}
                         </p>
                       ) : (
@@ -244,7 +244,7 @@ const StudentProfile = () => {
                               ))
                           ) : (
                             <p className="text-sm font-body text-muted-foreground italic">
-                              No hay mensajes registrados para esta sesión.
+                              No messages recorded for this session.
                             </p>
                           )}
                         </div>

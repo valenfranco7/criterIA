@@ -21,15 +21,15 @@ const Conversations = () => {
 
   return (
     <div className="p-8 animate-fade-in max-w-3xl">
-      <h2 className="text-2xl font-serif mb-6">Conversaciones</h2>
+      <h2 className="text-2xl font-serif mb-6">Conversations</h2>
 
       {loading && (
-        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+        <p className="text-sm text-muted-foreground font-body">Loading...</p>
       )}
 
       {!loading && items.length === 0 && (
         <p className="text-sm text-muted-foreground font-body">
-          Todavía no hay conversaciones. Completá una actividad para que aparezca acá.
+          No conversations yet. Complete an activity for it to appear here.
         </p>
       )}
 
@@ -45,16 +45,16 @@ const Conversations = () => {
                 <p className="text-xs text-muted-foreground font-body">
                   {activity.topic} ·{" "}
                   {session.completed_at
-                    ? new Date(session.completed_at).toLocaleDateString("es-AR")
+                    ? new Date(session.completed_at).toLocaleDateString("en-US")
                     : session.started_at
-                    ? new Date(session.started_at).toLocaleDateString("es-AR")
+                    ? new Date(session.started_at).toLocaleDateString("en-US")
                     : ""}
                   {" · "}
                   {session.status === "completed"
-                    ? "Completada"
+                    ? "Completed"
                     : session.status === "in_progress"
-                    ? "En curso"
-                    : "Pendiente"}
+                    ? "In progress"
+                    : "Pending"}
                 </p>
               </div>
               {expanded === session.id ? (
@@ -76,7 +76,7 @@ const Conversations = () => {
                     onClick={() => navigate(`/estudiante/actividad/${activity.id}`)}
                     className="text-xs text-primary font-body hover:underline"
                   >
-                    Continuar conversación →
+                    Continue conversation →
                   </button>
                 )}
               </div>

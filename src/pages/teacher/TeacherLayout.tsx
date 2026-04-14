@@ -2,16 +2,16 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BookOpen, FileText, Activity, Users, LogOut } from "lucide-react";
 
 const navItems = [
-  { label: "Mis cursos", path: "/profesor/cursos", icon: BookOpen },
-  { label: "Crear actividad", path: "/profesor/planificacion-clase", icon: FileText },
-  { label: "Actividades", path: "/profesor/actividades", icon: Activity },
-  { label: "Panel de alumnos", path: "/profesor/alumnos", icon: Users },
+  { label: "My courses", path: "/profesor/cursos", icon: BookOpen },
+  { label: "Create activity", path: "/profesor/planificacion-clase", icon: FileText },
+  { label: "Activities", path: "/profesor/actividades", icon: Activity },
+  { label: "Student panel", path: "/profesor/alumnos", icon: Users },
 ];
 
 const TeacherLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const today = new Date().toLocaleDateString("es-AR", {
+  const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -58,14 +58,14 @@ const TeacherLayout = () => {
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground font-body transition-colors"
           >
             <LogOut className="h-4 w-4" />
-            Salir
+            Log out
           </button>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0">
         <header className="px-8 py-5 border-b border-border">
-          <h1 className="text-xl font-serif">Hola, Yair</h1>
+          <h1 className="text-xl font-serif">Hi, Yair</h1>
           <p className="text-sm text-muted-foreground font-body capitalize">{today}</p>
         </header>
         <div className="flex-1 overflow-auto p-8 min-w-0">

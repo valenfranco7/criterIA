@@ -3,14 +3,14 @@ import { getUserId, setUserId } from '@/lib/api';
 
 // Lista fija alineada con seed.ts
 const DEMO_USERS = [
-  { id: 'yairp', label: 'Yair Perez (docente)' },
-  { id: 'rosariom', label: 'Rosario Morales (docente)' },
-  { id: 'sofiam', label: 'Sofía Martínez (alumna)' },
-  { id: 'mateol', label: 'Mateo López (alumno)' },
-  { id: 'valentinag', label: 'Valentina García (alumna)' },
-  { id: 'thiagor', label: 'Thiago Rodríguez (alumno)' },
-  { id: 'camilaf', label: 'Camila Fernández (alumna)' },
-  { id: 'benjamind', label: 'Benjamín Díaz (alumno)' },
+  { id: 'yairp', label: 'Yair Perez (teacher)' },
+  { id: 'rosariom', label: 'Rosario Morales (teacher)' },
+  { id: 'sofiam', label: 'Sofía Martínez (student)' },
+  { id: 'mateol', label: 'Mateo López (student)' },
+  { id: 'valentinag', label: 'Valentina García (student)' },
+  { id: 'thiagor', label: 'Thiago Rodríguez (student)' },
+  { id: 'camilaf', label: 'Camila Fernández (student)' },
+  { id: 'benjamind', label: 'Benjamín Díaz (student)' },
 ];
 
 export function UserSwitcher() {
@@ -33,7 +33,7 @@ export function UserSwitcher() {
       onChange={handleChange}
       className="h-9 px-3 text-sm rounded-md border border-input bg-background"
     >
-      <option value="">— elegir usuario —</option>
+      <option value="">— select user —</option>
       {DEMO_USERS.map((u) => (
         <option key={u.id} value={u.id}>
           {u.label}

@@ -21,9 +21,9 @@ const StudentActivities = () => {
   }, []);
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "pending", label: "Pendientes" },
-    { key: "active", label: "En curso" },
-    { key: "completed", label: "Completadas" },
+    { key: "pending", label: "Pending" },
+    { key: "active", label: "In progress" },
+    { key: "completed", label: "Completed" },
   ];
 
   const filtered = allItems.filter(({ session }) => {
@@ -34,7 +34,7 @@ const StudentActivities = () => {
 
   return (
     <div className="p-8 animate-fade-in">
-      <h2 className="text-2xl font-serif mb-6">Mis actividades</h2>
+      <h2 className="text-2xl font-serif mb-6">My activities</h2>
 
       <div className="flex gap-1 mb-6 bg-muted rounded-lg p-1 w-fit">
         {tabs.map((t) => (
@@ -51,11 +51,11 @@ const StudentActivities = () => {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+        <p className="text-sm text-muted-foreground font-body">Loading...</p>
       ) : (
         <div className="space-y-3 max-w-2xl">
           {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground font-body">No hay actividades en esta categoría.</p>
+            <p className="text-sm text-muted-foreground font-body">No activities in this category.</p>
           )}
           {filtered.map(({ activity, session }) => (
             <button
@@ -67,7 +67,7 @@ const StudentActivities = () => {
               <p className="text-xs text-muted-foreground font-body mt-1">{activity.topic}</p>
               {session?.status === "in_progress" && (
                 <span className="inline-block mt-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-body">
-                  En curso
+                  In progress
                 </span>
               )}
             </button>

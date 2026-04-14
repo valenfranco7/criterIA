@@ -7,7 +7,7 @@ const TeacherCourses = () => {
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-serif mb-6">Mis cursos</h2>
+      <h2 className="text-2xl font-serif mb-6">My courses</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {courses.map((course) => (
           <button
@@ -19,15 +19,15 @@ const TeacherCourses = () => {
             <div className="mt-4 space-y-2 text-sm text-muted-foreground font-body">
               <div className="flex items-center gap-2">
                 <Users className="h-3.5 w-3.5" />
-                {course.students} alumnos
+                {course.students} students
               </div>
               <div className="flex items-center gap-2">
                 <BookOpen className="h-3.5 w-3.5" />
-                Última actividad: {course.lastActivity}
+                Last activity: {course.lastActivity}
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-3.5 w-3.5" />
-                Próxima clase: {course.nextClass}
+                Next class: {course.nextClass}
               </div>
             </div>
           </button>

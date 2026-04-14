@@ -62,7 +62,7 @@ const TeacherActivities = () => {
 
   const startFinalize = useCallback(async (activityId: string) => {
     setFinalizingId(activityId);
-    setFinalizeStep("Iniciando...");
+    setFinalizeStep("Starting...");
     setConfirmFinalizeId(null);
 
     const apiBase = import.meta.env.VITE_API_URL ?? '';
@@ -111,7 +111,7 @@ const TeacherActivities = () => {
     return (
       <div className="animate-fade-in flex items-center gap-2 text-muted-foreground font-body mt-10">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Cargando actividades…
+        Loading activities…
       </div>
     );
   }
@@ -119,15 +119,15 @@ const TeacherActivities = () => {
   if (activitiesError || !activitiesData) {
     return (
       <div className="animate-fade-in text-destructive font-body mt-10">
-        Error al cargar las actividades. Intente de nuevo más tarde.
+        Error loading activities. Please try again later.
       </div>
     );
   }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "pending", label: "Pendientes", count: activitiesData.pending.length },
-    { key: "active", label: "En curso", count: activitiesData.active.length },
-    { key: "finished", label: "Finalizadas", count: activitiesData.finished.length },
+    { key: "pending", label: "Pending", count: activitiesData.pending.length },
+    { key: "active", label: "In progress", count: activitiesData.active.length },
+    { key: "finished", label: "Completed", count: activitiesData.finished.length },
   ];
 
   const items: ActivityWithCounts[] =
@@ -139,7 +139,7 @@ const TeacherActivities = () => {
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-serif mb-6">Actividades</h2>
+      <h2 className="text-2xl font-serif mb-6">Activities</h2>
 
       <div className="flex gap-1 mb-6 bg-muted rounded-lg p-1 w-fit">
         {tabs.map((t) => (
@@ -161,7 +161,7 @@ const TeacherActivities = () => {
       <div className="space-y-3">
         {items.length === 0 && (
           <p className="text-sm text-muted-foreground font-body">
-            No hay actividades en esta sección.
+            No activities in this section.
           </p>
         )}
 
@@ -182,7 +182,7 @@ const TeacherActivities = () => {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5" />
-                      {new Date(act.created_at).toLocaleDateString("es-AR")}
+                      {new Date(act.created_at).toLocaleDateString("en-US")}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground font-body mt-2">
@@ -192,7 +192,7 @@ const TeacherActivities = () => {
 
                 <div className="text-right">
                   <div className="text-sm font-body text-muted-foreground">
-                    {act.completed_count}/{act.total_count} completaron
+                    {act.completed_count}/{act.total_count} completed
                   </div>
 
                   {tab === "pending" && (
@@ -208,7 +208,7 @@ const TeacherActivities = () => {
                         ) : (
                           <Play className="h-3.5 w-3.5 mr-1.5" />
                         )}
-                        Activar ahora
+                        Activate now
                       </Button>
                     </div>
                   )}
@@ -226,12 +226,12 @@ const TeacherActivities = () => {
                         ) : (
                           <Eye className="h-3.5 w-3.5 mr-1.5" />
                         )}
-                        {expandedId === act.id ? "Ocultar" : "Ver resultados"}
+                        {expandedId === act.id ? "Hide" : "View results"}
                       </Button>
                       {confirmFinalizeId === act.id && !isFinalizing ? (
                         <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
                           <p className="text-xs font-body text-muted-foreground">
-                            Se cerrarán todas las sesiones abiertas y se generará el resumen.
+                            All open sessions will be closed and the summary will be generated.
                           </p>
                           <div className="flex gap-2">
                             <Button
@@ -240,14 +240,14 @@ const TeacherActivities = () => {
                               className="flex-1 text-xs"
                               onClick={() => setConfirmFinalizeId(null)}
                             >
-                              Cancelar
+                              Cancel
                             </Button>
                             <Button
                               size="sm"
                               className="flex-1 text-xs"
                               onClick={() => startFinalize(act.id)}
                             >
-                              Confirmar
+                              Confirm
                             </Button>
                           </div>
                         </div>
@@ -264,7 +264,7 @@ const TeacherActivities = () => {
                           ) : (
                             <Square className="h-3.5 w-3.5 mr-1.5" />
                           )}
-                          {isFinalizing ? finalizeStep : "Finalizar actividad"}
+                          {isFinalizing ? finalizeStep : "Finalize activity"}
                         </Button>
                       )}
                     </div>
@@ -282,7 +282,7 @@ const TeacherActivities = () => {
                       ) : (
                         <Eye className="h-3.5 w-3.5 mr-1.5" />
                       )}
-                      {expandedId === act.id ? "Ocultar" : "Ver resultados"}
+                      {expandedId === act.id ? "Hide" : "View results"}
                     </Button>
                   )}
                 </div>
@@ -291,25 +291,25 @@ const TeacherActivities = () => {
               {expandedId === act.id && expandedAnalysis && (
                 <div className="mt-4 border-t border-border pt-4 space-y-5 min-w-0">
                   {/* Metrics row */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl p-4 text-center bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/60">
-                      <p className="text-3xl font-serif font-semibold text-emerald-700">{Math.round(expandedAnalysis.class_comprehension_avg)}%</p>
-                      <p className="text-xs text-emerald-600/80 font-body mt-1">comprensión promedio</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-2xl p-6 text-center bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-200/50">
+                      <p className="text-5xl font-serif font-bold text-white drop-shadow-sm">{Math.round(expandedAnalysis.class_comprehension_avg)}%</p>
+                      <p className="text-sm font-body font-semibold text-emerald-100 mt-2 uppercase tracking-widest">Average Comprehension</p>
                     </div>
-                    <div className="rounded-xl p-4 text-center bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/60">
-                      <p className="text-3xl font-serif font-semibold text-amber-700">{expandedAnalysis.difficult_topics?.length ?? 0}</p>
-                      <p className="text-xs text-amber-600/80 font-body mt-1">temas difíciles</p>
+                    <div className="rounded-2xl p-6 text-center bg-gradient-to-br from-amber-400 to-amber-500 shadow-lg shadow-amber-200/50">
+                      <p className="text-5xl font-serif font-bold text-white drop-shadow-sm">{expandedAnalysis.difficult_topics?.length ?? 0}</p>
+                      <p className="text-sm font-body font-semibold text-amber-100 mt-2 uppercase tracking-widest">Difficult Topics</p>
                     </div>
-                    <div className="rounded-xl p-4 text-center bg-gradient-to-br from-rose-50 to-rose-100/50 border border-rose-200/60">
-                      <p className="text-3xl font-serif font-semibold text-rose-700">{expandedAnalysis.struggling_students?.length ?? 0}</p>
-                      <p className="text-xs text-rose-600/80 font-body mt-1">necesitan apoyo</p>
+                    <div className="rounded-2xl p-6 text-center bg-gradient-to-br from-slate-500 to-slate-600 shadow-lg shadow-slate-200/50">
+                      <p className="text-5xl font-serif font-bold text-white drop-shadow-sm">{expandedAnalysis.struggling_students?.length ?? 0}</p>
+                      <p className="text-sm font-body font-semibold text-slate-200 mt-2 uppercase tracking-widest">Need Support</p>
                     </div>
                   </div>
 
                   {/* Summary */}
                   {expandedAnalysis.class_summary && (
                     <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4">
-                      <p className="text-xs font-body text-slate-500 uppercase tracking-wider mb-2">Resumen de la clase</p>
+                      <p className="text-sm font-body font-semibold text-slate-600 uppercase tracking-wider mb-2">Class Summary</p>
                       <p className="text-sm font-body text-slate-700 leading-relaxed">{expandedAnalysis.class_summary}</p>
                     </div>
                   )}
@@ -317,7 +317,7 @@ const TeacherActivities = () => {
                   {/* Difficult topics */}
                   {expandedAnalysis.difficult_topics && expandedAnalysis.difficult_topics.length > 0 && (
                     <div>
-                      <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mb-3">Temas difíciles</p>
+                      <p className="text-sm font-body font-semibold text-foreground uppercase tracking-wider mb-3">Difficult Topics</p>
                       <div className="space-y-2">
                         {expandedAnalysis.difficult_topics.map((t: any, i: number) => (
                           <div key={i} className="flex items-start gap-3 bg-amber-50/60 border border-amber-200/40 rounded-lg p-3">
@@ -339,33 +339,17 @@ const TeacherActivities = () => {
                   {/* Struggling students */}
                   {expandedAnalysis.struggling_students && expandedAnalysis.struggling_students.length > 0 && (
                     <div>
-                      <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mb-3">Estudiantes que necesitan apoyo</p>
+                      <p className="text-sm font-body font-semibold text-foreground uppercase tracking-wider mb-3">Students Who Need Support</p>
                       <div className="space-y-2">
                         {expandedAnalysis.struggling_students.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center gap-3 bg-rose-50/60 border border-rose-200/40 rounded-lg p-3">
-                            <div className="shrink-0 w-10 h-10 rounded-full bg-rose-200/70 text-rose-800 text-sm font-bold flex items-center justify-center">
+                          <div key={i} className="flex items-center gap-3 bg-muted/50 border border-border rounded-lg p-3">
+                            <div className="shrink-0 w-10 h-10 rounded-full bg-slate-200/70 text-slate-700 text-sm font-bold flex items-center justify-center">
                               {s.comprehension_pct}%
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-body font-medium text-rose-900">{s.name}</p>
-                              <p className="text-xs font-body text-rose-700/70 truncate">{s.main_difficulty}</p>
+                              <p className="text-sm font-body font-medium text-foreground">{s.name}</p>
+                              <p className="text-xs font-body text-muted-foreground truncate">{s.main_difficulty}</p>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Suggested groups */}
-                  {expandedAnalysis.suggested_groups && expandedAnalysis.suggested_groups.length > 0 && (
-                    <div>
-                      <p className="text-xs font-body text-muted-foreground uppercase tracking-wider mb-3">Grupos sugeridos</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {expandedAnalysis.suggested_groups.map((g: any, i: number) => (
-                          <div key={i} className="bg-violet-50/60 border border-violet-200/40 rounded-lg p-3">
-                            <p className="text-sm font-body font-medium text-violet-900">{g.group_name}</p>
-                            <p className="text-xs font-body text-violet-600 mt-0.5">{g.topic}</p>
-                            <p className="text-xs font-body text-violet-700/60 mt-1">{g.rationale}</p>
                           </div>
                         ))}
                       </div>
@@ -375,7 +359,7 @@ const TeacherActivities = () => {
                   {/* Suggested plan */}
                   {expandedAnalysis.suggested_plan && (
                     <div className="bg-gradient-to-br from-sky-50 to-indigo-50/50 border border-sky-200/60 rounded-xl p-4">
-                      <p className="text-xs font-body text-sky-600 uppercase tracking-wider mb-2">Plan sugerido para la próxima clase</p>
+                      <p className="text-sm font-body font-semibold text-sky-700 uppercase tracking-wider mb-2">Suggested Plan for Next Class</p>
                       <div className="text-sm font-body text-sky-900 leading-relaxed whitespace-pre-wrap">
                         {expandedAnalysis.suggested_plan}
                       </div>
@@ -384,9 +368,10 @@ const TeacherActivities = () => {
 
                   {/* Generate class CTA */}
                   <div className="border border-dashed border-primary/30 rounded-xl p-5 text-center bg-primary/[0.02]">
-                    <p className="text-sm font-body text-muted-foreground mb-3">¿Querés generar una clase a partir de este análisis?</p>
-                    <Button onClick={() => {}}>
-                      Generar clase
+                    <p className="text-base font-serif font-semibold text-foreground mb-1">Want to generate a class from this analysis?</p>
+                    <p className="text-sm font-body text-muted-foreground mb-4">Create a new activity based on these results and recommendations.</p>
+                    <Button size="lg" onClick={() => {}}>
+                      Generate Class
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </div>

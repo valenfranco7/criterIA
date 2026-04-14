@@ -60,20 +60,20 @@ const StudentHome = () => {
 
   return (
     <div className="p-8 max-w-2xl animate-fade-in">
-      <h1 className="text-3xl font-serif mb-2">Hola, {userName || "..."}</h1>
-      <p className="text-muted-foreground font-body mb-10">Bienvenida de vuelta.</p>
+      <h1 className="text-3xl font-serif mb-2">Hi, {userName || "..."}</h1>
+      <p className="text-muted-foreground font-body mb-10">Welcome back.</p>
 
       {activities.length > 0 && (
         <div className="space-y-3 mb-8">
           {activities.map((act) => (
             <div key={act.id} className="bg-card border border-border rounded-lg p-6">
               <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-2">
-                {act.inProgress ? "Actividad en curso" : "Actividad pendiente"}
+                {act.inProgress ? "Activity in progress" : "Pending activity"}
               </p>
               <h2 className="font-serif text-xl mb-1">{act.title}</h2>
               <p className="text-sm text-muted-foreground font-body mb-4">{act.topic}</p>
               <Button onClick={() => navigate(`/estudiante/actividad/${act.id}`)}>
-                {act.inProgress ? "Continuar" : "Empezar"}
+                {act.inProgress ? "Continue" : "Start"}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </div>
@@ -85,11 +85,11 @@ const StudentHome = () => {
         onClick={() => navigate("/estudiante/mi-camino")}
         className="text-left w-full bg-card border border-border rounded-lg p-6 hover:border-primary/30 transition-all group"
       >
-        <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-1">Tu recorrido</p>
+        <p className="text-xs text-muted-foreground font-body uppercase tracking-wider mb-1">Your journey</p>
         <p className="font-serif text-lg group-hover:text-primary transition-colors">
-          {totalIdeas > 0 ? `Descubriste ${totalIdeas} idea${totalIdeas !== 1 ? 's' : ''}` : "Todavía no hay ideas registradas"}
+          {totalIdeas > 0 ? `You discovered ${totalIdeas} idea${totalIdeas !== 1 ? 's' : ''}` : "No ideas recorded yet"}
         </p>
-        <p className="text-sm text-muted-foreground font-body mt-1">Ver mi camino →</p>
+        <p className="text-sm text-muted-foreground font-body mt-1">View my path →</p>
       </button>
     </div>
   );

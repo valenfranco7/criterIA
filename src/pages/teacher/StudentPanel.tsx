@@ -57,8 +57,8 @@ const StudentPanel = () => {
   if (coursesLoading) {
     return (
       <div className="animate-fade-in">
-        <h2 className="text-2xl font-serif mb-6">Panel de alumnos</h2>
-        <p className="text-sm text-muted-foreground font-body">Cargando cursos...</p>
+        <h2 className="text-2xl font-serif mb-6">Student panel</h2>
+        <p className="text-sm text-muted-foreground font-body">Loading courses...</p>
       </div>
     );
   }
@@ -66,15 +66,15 @@ const StudentPanel = () => {
   if (coursesError) {
     return (
       <div className="animate-fade-in">
-        <h2 className="text-2xl font-serif mb-6">Panel de alumnos</h2>
-        <p className="text-sm text-destructive font-body">Error al cargar los cursos.</p>
+        <h2 className="text-2xl font-serif mb-6">Student panel</h2>
+        <p className="text-sm text-destructive font-body">Error loading courses.</p>
       </div>
     );
   }
 
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-serif mb-6">Panel de alumnos</h2>
+      <h2 className="text-2xl font-serif mb-6">Student panel</h2>
 
       <select
         value={selectedCourse ?? ""}
@@ -87,9 +87,9 @@ const StudentPanel = () => {
       </select>
 
       {detailLoading ? (
-        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+        <p className="text-sm text-muted-foreground font-body">Loading...</p>
       ) : detailError ? (
-        <p className="text-sm text-destructive font-body">Error al cargar el curso.</p>
+        <p className="text-sm text-destructive font-body">Error loading the course.</p>
       ) : course ? (
         <div className="space-y-6">
           {/* Course header with analytics */}
@@ -97,12 +97,12 @@ const StudentPanel = () => {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="font-serif text-lg">{course.name}</h3>
-                <p className="text-sm text-muted-foreground font-body">{course.year_or_level} · {students.length} alumnos</p>
+                <p className="text-sm text-muted-foreground font-body">{course.year_or_level} · {students.length} students</p>
               </div>
               {analytics && (
                 <div className="text-right">
                   <p className="text-3xl font-serif text-primary">{Math.round(analytics.course_comprehension_avg)}%</p>
-                  <p className="text-xs text-muted-foreground font-body">comprensión promedio</p>
+                  <p className="text-xs text-muted-foreground font-body">average comprehension</p>
                 </div>
               )}
             </div>
@@ -113,7 +113,7 @@ const StudentPanel = () => {
 
           {/* Student rankings */}
           <div>
-            <h4 className="font-serif text-base mb-3">Alumnos</h4>
+            <h4 className="font-serif text-base mb-3">Students</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {analytics?.student_rankings ? (
                 analytics.student_rankings
@@ -174,14 +174,14 @@ const StudentPanel = () => {
           {/* Difficult topics */}
           {analytics?.accumulated_difficult_topics && analytics.accumulated_difficult_topics.length > 0 && (
             <div>
-              <h4 className="font-serif text-base mb-3">Temas difíciles del curso</h4>
+              <h4 className="font-serif text-base mb-3">Difficult topics in the course</h4>
               <div className="space-y-2">
                 {analytics.accumulated_difficult_topics.map((topic, i) => (
                   <div key={i} className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-body font-medium">{topic.topic}</p>
                       <span className="text-xs text-muted-foreground font-body bg-muted px-2 py-0.5 rounded">
-                        {topic.frequency} {topic.frequency === 1 ? "actividad" : "actividades"}
+                        {topic.frequency} {topic.frequency === 1 ? "activity" : "activities"}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground font-body">{topic.description}</p>
@@ -194,7 +194,7 @@ const StudentPanel = () => {
           {/* Suggested groups */}
           {analytics?.suggested_groups && analytics.suggested_groups.length > 0 && (
             <div>
-              <h4 className="font-serif text-base mb-3">Grupos sugeridos</h4>
+              <h4 className="font-serif text-base mb-3">Suggested groups</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {analytics.suggested_groups.map((group, i) => (
                   <div key={i} className="bg-card border border-border rounded-lg p-4">
@@ -203,7 +203,7 @@ const StudentPanel = () => {
                       <p className="text-sm font-body font-medium">{group.group_name}</p>
                     </div>
                     <p className="text-xs text-muted-foreground font-body mb-2">
-                      Tema: {group.topic}
+                      Topic: {group.topic}
                     </p>
                     <p className="text-xs text-muted-foreground font-body mb-2">
                       {group.rationale}
@@ -228,7 +228,7 @@ const StudentPanel = () => {
           {!analytics && (
             <div className="bg-card border border-border rounded-lg p-6 text-center">
               <p className="text-sm text-muted-foreground font-body">
-                Todavía no hay análisis del curso. Se genera automáticamente después de cada resumen de actividad.
+                No course analysis yet. It is generated automatically after each activity summary.
               </p>
             </div>
           )}

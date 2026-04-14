@@ -41,7 +41,7 @@ const SocraticChat = () => {
         const item = list.items.find((i) => i.activity.id === activityId);
 
         if (!item) {
-          setError("Actividad no encontrada.");
+          setError("Activity not found.");
           setLoading(false);
           return;
         }
@@ -73,7 +73,7 @@ const SocraticChat = () => {
         }
       } catch (e) {
         if (cancelled) return;
-        setError("Error al cargar la actividad.");
+        setError("Error loading the activity.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -122,7 +122,7 @@ const SocraticChat = () => {
       setSession(result.session);
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== tempStudentMsg.id));
-      setError("Error al enviar el mensaje. Intentá de nuevo.");
+      setError("Error sending message. Please try again.");
     } finally {
       setThinking(false);
     }
@@ -138,7 +138,7 @@ const SocraticChat = () => {
       );
       navigate("/estudiante/conversaciones");
     } catch {
-      setError("Error al cerrar la sesión.");
+      setError("Error closing the session.");
       setClosing(false);
     }
   };
@@ -153,7 +153,7 @@ const SocraticChat = () => {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <p className="text-sm text-muted-foreground font-body">Cargando...</p>
+        <p className="text-sm text-muted-foreground font-body">Loading...</p>
       </div>
     );
   }
@@ -179,7 +179,7 @@ const SocraticChat = () => {
           </button>
           <div>
             <p className="text-sm font-body font-medium">
-              {activity?.title ?? "Actividad"}
+              {activity?.title ?? "Activity"}
             </p>
             <p className="text-xs text-muted-foreground font-body">
               {activity?.topic ?? ""}
@@ -233,12 +233,12 @@ const SocraticChat = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Escribí tu respuesta..."
+              placeholder="Write your answer..."
               disabled={thinking || session?.status === 'completed'}
               className="flex-1 px-4 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             />
             <Button onClick={handleSend} disabled={thinking || !input.trim() || session?.status === 'completed'}>
-              Enviar
+              Send
             </Button>
           </div>
           {session?.status !== 'completed' && (
@@ -250,7 +250,7 @@ const SocraticChat = () => {
                 onClick={handleClose}
                 disabled={closing || thinking}
               >
-                {closing ? "Cerrando..." : "Cerrar actividad"}
+                {closing ? "Closing..." : "Close activity"}
               </Button>
             </div>
           )}

@@ -2,10 +2,10 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Home, BookOpen, Map, MessageSquare, LogOut } from "lucide-react";
 
 const navItems = [
-  { label: "Inicio", path: "/estudiante", icon: Home, exact: true },
-  { label: "Mis actividades", path: "/estudiante/actividades", icon: BookOpen },
-  { label: "Mi camino", path: "/estudiante/mi-camino", icon: Map },
-  { label: "Conversaciones", path: "/estudiante/conversaciones", icon: MessageSquare },
+  { label: "Home", path: "/estudiante", icon: Home, exact: true },
+  { label: "My activities", path: "/estudiante/actividades", icon: BookOpen },
+  { label: "My path", path: "/estudiante/mi-camino", icon: Map },
+  { label: "Conversations", path: "/estudiante/conversaciones", icon: MessageSquare },
 ];
 
 const StudentLayout = () => {
@@ -52,7 +52,7 @@ const StudentLayout = () => {
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground font-body transition-colors"
           >
             <LogOut className="h-4 w-4" />
-            Salir
+            Log out
           </button>
         </div>
       </aside>
