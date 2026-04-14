@@ -157,8 +157,8 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     if (!user) return;
 
     const students = db
-      .prepare(`SELECT * FROM users WHERE role = 'student' ORDER BY name ASC`)
-      .all() as User[];
+      .prepare(`SELECT id, name, avatar_initials, created_at FROM users WHERE role = 'student' ORDER BY name ASC`)
+      .all() as Pick<User, 'id' | 'name' | 'avatar_initials' | 'created_at'>[];
 
     return { students };
   });
