@@ -22,7 +22,7 @@ export async function ensureAgentSetup(): Promise<{ agentId: string; environment
   if (!_agentId) {
     const agent = await (client.beta as any).agents.create({
       name: 'Socrates',
-      model: 'claude-opus-4-6',
+      model: { id: 'claude-opus-4-6', speed: 'fast' },
       system: systemPrompt,
       tools: [
         {
