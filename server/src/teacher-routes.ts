@@ -99,7 +99,26 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
   app.get('/courses/:courseId', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
-    reply.code(501).send({ error: 'not_implemented' });
+
+    const { courseId } = req.params as { courseId: string };
+
+    const course = db
+      .prepare(`SELECT * FROM courses WHERE id = ? AND teacher_id = ?`)
+      .get(courseId, user.id) as Course | undefined;
+
+    if (!course) return reply.code(404).send({ error: 'not_found' });
+
+    const students = db
+      .prepare(
+        `SELECT u.id, u.name, u.avatar_initials, u.created_at
+         FROM users u
+         JOIN course_students cs ON cs.student_id = u.id
+         WHERE cs.course_id = ?
+         ORDER BY u.name ASC`
+      )
+      .all(courseId) as Pick<User, 'id' | 'name' | 'avatar_initials' | 'created_at'>[];
+
+    return { course, students };
   });
 
   // POST /api/teacher/class-plans → ClassPlan

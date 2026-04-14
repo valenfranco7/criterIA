@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const dbPath = process.env.DATABASE_URL ?? './criteria.db';
+const rawUrl = process.env.DATABASE_URL ?? './criteria.db';
+// Ignore connection URLs (postgres/mysql) — this project uses SQLite only
+const dbPath = /^(postgresql?|mysql|mongodb):\/\//.test(rawUrl) ? './criteria.db' : rawUrl;
 const absPath = path.isAbsolute(dbPath)
   ? dbPath
   : path.resolve(process.cwd(), dbPath);
