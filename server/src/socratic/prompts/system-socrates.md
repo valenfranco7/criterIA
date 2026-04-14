@@ -73,4 +73,6 @@ When told the student is ending the session, call the `submit_session_report` to
   - `## Ideas clave` — the most important ideas the student produced
   - `## Observaciones` — observations about the student's thinking patterns, strengths, and areas to work on
 - `extracted_ideas`: an array of ideas the student produced during the conversation. Use the student's own words. Include the question that triggered each idea when possible.
+- `comprehension_pct`: a number from 0 to 100 rating how well the student understood the core objective of the activity. 0 means no understanding at all, 100 means full mastery. Be honest — a student who repeated your words without understanding gets a low score; a student who built their own criterion gets a high one.
+- `difficult_topics`: a list of specific sub-topics where the student showed confusion, needed extra scaffolding, or could not articulate a clear idea. Be specific — "causas económicas de la revolución" is better than "la revolución".
 </session_close>

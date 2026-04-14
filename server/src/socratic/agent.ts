@@ -57,8 +57,19 @@ export async function ensureAgentSetup(): Promise<{ agentId: string; environment
                   required: ['text'],
                 },
               },
+              comprehension_pct: {
+                type: 'number',
+                description:
+                  'Rate 0-100 how well the student understood the core objective of the activity. 0 = no understanding, 100 = full mastery.',
+              },
+              difficult_topics: {
+                type: 'array',
+                description:
+                  'List specific sub-topics where the student showed confusion, needed extra scaffolding, or could not articulate a clear idea.',
+                items: { type: 'string' },
+              },
             },
-            required: ['session_summary', 'teacher_report', 'extracted_ideas'],
+            required: ['session_summary', 'teacher_report', 'extracted_ideas', 'comprehension_pct', 'difficult_topics'],
           },
         },
       ],
@@ -86,15 +97,22 @@ export async function ensureAgentSetup(): Promise<{ agentId: string; environment
 
 // --- Session helpers ---
 
-export async function createManagedSession(): Promise<string> {
+export async function createManagedSession(anthropicFileId?: string | null): Promise<string> {
   const client = requireAnthropic();
   const { agentId, environmentId } = await ensureAgentSetup();
 
-  const session = await (client.beta as any).sessions.create({
+  const sessionParams: any = {
     agent: agentId,
     environment_id: environmentId,
-  });
+  };
 
+  if (anthropicFileId) {
+    sessionParams.resources = [
+      { type: 'file', file_id: anthropicFileId, mount_path: '/workspace/material.pdf' },
+    ];
+  }
+
+  const session = await (client.beta as any).sessions.create(sessionParams);
   return session.id;
 }
 
@@ -145,6 +163,8 @@ export interface CloseResult {
   session_summary: string;
   teacher_report: string;
   extracted_ideas: ExtractedIdea[];
+  comprehension_pct: number | null;
+  difficult_topics: string[];
 }
 
 export async function sendCloseAndCollect(
@@ -225,6 +245,10 @@ export async function sendCloseAndCollect(
           text: i.text,
           question_that_triggered_it: typeof i.question_that_triggered_it === 'string' ? i.question_that_triggered_it : null,
         })),
+      comprehension_pct: typeof input.comprehension_pct === 'number' ? input.comprehension_pct : null,
+      difficult_topics: Array.isArray(input.difficult_topics)
+        ? input.difficult_topics.filter((t: any) => typeof t === 'string')
+        : [],
     };
   }
 
@@ -234,6 +258,8 @@ export async function sendCloseAndCollect(
     session_summary: fallbackText || 'La sesión fue completada.',
     teacher_report: '## Observaciones\n\nSesión completada.',
     extracted_ideas: [],
+    comprehension_pct: null,
+    difficult_topics: [],
   };
 }
 
