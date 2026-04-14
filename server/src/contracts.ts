@@ -58,6 +58,7 @@ export interface Activity {
   estimated_duration_minutes: number;
   status: ActivityStatus;
   config: ActivityConfig;
+  anthropic_file_id: string | null;
   created_at: string;
 }
 
@@ -79,6 +80,8 @@ export interface ActivitySession {
   teacher_report: string | null;
   extracted_ideas: ExtractedIdea[];
   managed_session_id: string | null;
+  comprehension_pct: number | null;
+  difficult_topics: string[];
 }
 
 export interface Message {
@@ -117,6 +120,7 @@ export interface ActivitySummary {
   course_id: string;
   summary: string;
   understanding_avg: number | null;
+  analysis: ClassAnalysis | null;
   created_at: string;
 }
 
@@ -144,6 +148,7 @@ export interface CreateActivityRequest {
   topic: string;
   estimated_duration_minutes: number;
   config: ActivityConfig;
+  anthropic_file_id?: string | null;
 }
 
 export type ProposedActivity = Omit<CreateActivityRequest, 'course_id'>;
@@ -229,4 +234,27 @@ export interface ListConversationsResponse {
     session: ActivitySession;
     activity: Activity;
   }>;
+}
+
+export interface ClassAnalysis {
+  class_comprehension_avg: number;
+  difficult_topics: Array<{
+    topic: string;
+    student_count: number;
+    description: string;
+  }>;
+  struggling_students: Array<{
+    student_id: string;
+    name: string;
+    comprehension_pct: number;
+    main_difficulty: string;
+  }>;
+  suggested_groups: Array<{
+    group_name: string;
+    student_ids: string[];
+    topic: string;
+    rationale: string;
+  }>;
+  class_summary: string;
+  suggested_plan: string;
 }

@@ -48,6 +48,7 @@ CREATE TABLE activities (
   estimated_duration_minutes INTEGER NOT NULL DEFAULT 30,
   status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'closed')),
   config TEXT NOT NULL DEFAULT '{}',
+  anthropic_file_id TEXT,
   created_at TEXT NOT NULL
 );
 
@@ -64,7 +65,9 @@ CREATE TABLE activity_sessions (
   session_summary TEXT,
   teacher_report TEXT,
   extracted_ideas TEXT DEFAULT '[]',
-  managed_session_id TEXT
+  managed_session_id TEXT,
+  comprehension_pct INTEGER,
+  difficult_topics TEXT DEFAULT '[]'
 );
 CREATE INDEX idx_sessions_by_student ON activity_sessions(student_id);
 CREATE INDEX idx_sessions_by_activity ON activity_sessions(activity_id);
@@ -110,5 +113,6 @@ CREATE TABLE activity_summaries (
   course_id TEXT NOT NULL REFERENCES courses(id),
   summary TEXT NOT NULL,
   understanding_avg REAL,
+  analysis TEXT,
   created_at TEXT NOT NULL
 );
