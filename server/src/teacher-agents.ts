@@ -1,9 +1,8 @@
 import type {
-  ActivitySummary,
   ClassPlan,
   ProposedActivity,
 } from './contracts.js';
-import { db, jsonParse } from './db.js';
+import { jsonParse } from './db.js';
 import { requireAnthropic, MODEL_TUTOR } from './anthropic.js';
 
 /** Strip optional ```json ... ``` markdown fences from an LLM response. */
@@ -12,74 +11,6 @@ function stripJsonFences(text: string): string {
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
     .trim();
-}
-
-export async function summarizeActivity(
-  activityId: string
-): Promise<Omit<ActivitySummary, 'id' | 'created_at'>> {
-  const activity = db
-    .prepare('SELECT * FROM activities WHERE id = ?')
-    .get(activityId) as any;
-
-  if (!activity) {
-    throw new Error('activity_not_found');
-  }
-
-  const sessions = db
-    .prepare(
-      `SELECT s.session_summary, s.teacher_report, u.name AS student_name
-       FROM activity_sessions s
-       JOIN users u ON u.id = s.student_id
-       WHERE s.activity_id = ? AND s.status = 'completed'`
-    )
-    .all(activityId) as any[];
-
-  if (sessions.length === 0) {
-    throw new Error('no_completed_sessions');
-  }
-
-  const sessionLines = sessions
-    .map(
-      (s, i) =>
-        `Alumno ${i + 1}: ${s.student_name}\n` +
-        `  Resumen de sesión: ${s.session_summary ?? '(sin resumen)'}\n` +
-        `  Reporte docente: ${s.teacher_report ?? '(sin reporte)'}`
-    )
-    .join('\n\n');
-
-  const context =
-    `Actividad: ${activity.title}\n` +
-    `Tema: ${activity.topic}\n` +
-    `Objetivo: ${activity.objective}\n\n` +
-    `Sesiones completadas (${sessions.length}):\n\n` +
-    sessionLines;
-
-  const client = requireAnthropic();
-
-  const message = await client.messages.create({
-    model: MODEL_TUTOR,
-    max_tokens: 1024,
-    system:
-      'Sos un analista pedagógico. Te doy una actividad educativa y los resúmenes de las sesiones de varios alumnos. ' +
-      'Generá: 1) Un resumen agregado del nivel de comprensión del grupo (3-5 oraciones). Mencioná patrones comunes, ' +
-      'fortalezas del grupo, y áreas que necesitan refuerzo. 2) Un número de 0 a 100 que represente el nivel de ' +
-      'comprensión promedio. Respondé EXACTAMENTE en JSON: {"summary": "...", "understanding_avg": N}. ' +
-      'No agregues texto fuera del JSON.',
-    messages: [{ role: 'user', content: context }],
-  });
-
-  const raw = message.content[0].type === 'text' ? message.content[0].text : '';
-  const parsed = jsonParse<{ summary: string; understanding_avg: number }>(
-    stripJsonFences(raw),
-    { summary: '', understanding_avg: 0 }
-  );
-
-  return {
-    activity_id: activityId,
-    course_id: activity.course_id,
-    summary: parsed.summary,
-    understanding_avg: parsed.understanding_avg,
-  };
 }
 
 export async function planClass(

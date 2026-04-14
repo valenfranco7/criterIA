@@ -3,7 +3,7 @@ import { requireRole } from './auth.js';
 import { db, jsonParse, jsonStringify } from './db.js';
 import { nanoid } from 'nanoid';
 import type { CreateActivityRequest } from './contracts.js';
-import { summarizeActivity } from './teacher-agents.js';
+import { runClassAnalyst } from './class-analyst.js';
 import { refreshStudentProfile } from './profile-updater.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
@@ -232,33 +232,81 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
 
-    const { id } = req.params as { id: string };
+    const { id: activityId } = req.params as { id: string };
 
-    const activity = db
-      .prepare('SELECT * FROM activities WHERE id = ? AND teacher_id = ?')
-      .get(id, user.id) as any;
+    // Close any open sessions first
+    const openSessions = db
+      .prepare(
+        `SELECT id, managed_session_id FROM activity_sessions
+         WHERE activity_id = ? AND status = 'in_progress' AND managed_session_id IS NOT NULL`
+      )
+      .all(activityId) as Array<{ id: string; managed_session_id: string }>;
 
-    if (!activity) {
-      return reply.code(404).send({ error: 'activity_not_found' });
-    }
+    if (openSessions.length > 0) {
+      const { sendCloseAndCollect } = await import('./socratic/agent.js');
+      const closeResults = await Promise.all(
+        openSessions.map(async (s) => {
+          try {
+            return { id: s.id, managed: s.managed_session_id, result: await sendCloseAndCollect(s.managed_session_id) };
+          } catch (err) {
+            console.error('[generate-summary] Failed to close session:', err);
+            return null;
+          }
+        })
+      );
 
-    try {
-      const result = await summarizeActivity(id);
-      const summaryId = nanoid(12);
       const now = new Date().toISOString();
-
-      db.prepare(
-        `INSERT INTO activity_summaries (id, activity_id, course_id, summary, understanding_avg, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).run(summaryId, result.activity_id, result.course_id, result.summary, result.understanding_avg, now);
-
-      reply.send({ id: summaryId, ...result, created_at: now });
-    } catch (err: any) {
-      if (err?.message === 'no_completed_sessions') {
-        return reply.code(400).send({ error: 'no_completed_sessions' });
+      for (const item of closeResults) {
+        if (!item?.result) continue;
+        const r = item.result;
+        db.prepare(
+          `UPDATE activity_sessions
+           SET status = 'completed', completed_at = ?, session_summary = ?, teacher_report = ?,
+               extracted_ideas = ?, comprehension_pct = ?, difficult_topics = ?
+           WHERE id = ?`
+        ).run(
+          now, r.session_summary, r.teacher_report,
+          JSON.stringify(r.extracted_ideas), r.comprehension_pct, JSON.stringify(r.difficult_topics),
+          item.id
+        );
       }
-      throw err;
     }
+
+    let analysisResult;
+    try {
+      analysisResult = await runClassAnalyst(activityId);
+    } catch (err: any) {
+      if (err.message === 'no_completed_sessions') {
+        return reply.code(400).send({ error: 'No completed sessions to analyze' });
+      }
+      console.error('[generate-summary] Analyst failed:', err);
+      return reply.code(502).send({ error: 'Failed to generate analysis' });
+    }
+
+    const summaryId = nanoid();
+    const activityRow = db.prepare('SELECT course_id FROM activities WHERE id = ?').get(activityId) as { course_id: string };
+
+    db.prepare(
+      `INSERT INTO activity_summaries (id, activity_id, course_id, summary, understanding_avg, analysis, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      summaryId, activityId, activityRow.course_id,
+      analysisResult.summary, analysisResult.understanding_avg,
+      JSON.stringify(analysisResult.analysis),
+      new Date().toISOString()
+    );
+
+    return reply.send({
+      summary: {
+        id: summaryId,
+        activity_id: activityId,
+        course_id: activityRow.course_id,
+        summary: analysisResult.summary,
+        understanding_avg: analysisResult.understanding_avg,
+        analysis: analysisResult.analysis,
+        created_at: new Date().toISOString(),
+      },
+    });
   });
 
   // GET /api/teacher/students/:id → TeacherStudentDetail
