@@ -174,8 +174,8 @@ const SocraticChat = () => {
             <p className="text-sm font-body font-medium">
               {activity?.title ?? "Actividad"}
             </p>
-            <p className="text-xs text-muted-foreground font-body capitalize">
-              {session?.current_phase ?? ""}
+            <p className="text-xs text-muted-foreground font-body">
+              {activity?.topic ?? ""}
             </p>
           </div>
         </div>
