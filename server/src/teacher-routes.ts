@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from './auth.js';
 import { db } from './db.js';
-import type { Course } from './contracts.js';
+import type { Course, User } from './contracts.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
   // GET /api/teacher/courses → { courses: Course[] }
@@ -87,6 +87,18 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
     reply.code(501).send({ error: 'not_implemented' });
+  });
+
+  // GET /api/teacher/students → { students: User[] }
+  app.get('/students', async (req, reply) => {
+    const user = await requireRole(req, reply, 'teacher');
+    if (!user) return;
+
+    const students = db
+      .prepare(`SELECT * FROM users WHERE role = 'student' ORDER BY name ASC`)
+      .all() as User[];
+
+    return { students };
   });
 
   // GET /api/teacher/students/:id → TeacherStudentDetail
