@@ -1,25 +1,40 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from "react-router-dom";
+import { courses } from "@/data/mockData";
+import { Users, Clock, BookOpen } from "lucide-react";
 
-export default function TeacherCourses() {
+const TeacherCourses = () => {
+  const navigate = useNavigate();
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Cursos</h1>
-        <p className="text-muted-foreground">
-          Listado de cursos del docente con cantidad de alumnos.
-        </p>
+    <div className="animate-fade-in">
+      <h2 className="text-2xl font-serif mb-6">Mis cursos</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {courses.map((course) => (
+          <button
+            key={course.id}
+            onClick={() => navigate(`/profesor/alumnos?curso=${course.id}`)}
+            className="text-left bg-card border border-border rounded-lg p-6 hover:border-primary/30 hover:shadow-sm transition-all group"
+          >
+            <h3 className="font-serif text-lg group-hover:text-primary transition-colors">{course.name}</h3>
+            <div className="mt-4 space-y-2 text-sm text-muted-foreground font-body">
+              <div className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5" />
+                {course.students} alumnos
+              </div>
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-3.5 w-3.5" />
+                Última actividad: {course.lastActivity}
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Próxima clase: {course.nextClass}
+              </div>
+            </div>
+          </button>
+        ))}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>En construcción</CardTitle>
-          <CardDescription>
-            GET /api/teacher/courses · POST /api/teacher/courses
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Acá va el listado de cursos con su cantidad de alumnos.
-        </CardContent>
-      </Card>
     </div>
   );
-}
+};
+
+export default TeacherCourses;

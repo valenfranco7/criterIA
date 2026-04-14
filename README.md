@@ -4,7 +4,7 @@ Plataforma socrática para acompañar el pensamiento del alumno.
 
 ## Stack
 
-- **Frontend**: React + Vite + TypeScript + Tailwind (bun)
+- **Frontend**: React 18 + Vite + TypeScript + Tailwind + shadcn/ui (bun)
 - **Backend**: Node + Fastify + TypeScript + better-sqlite3 + `@anthropic-ai/sdk` (npm)
 - **DB**: SQLite local (`server/criteria.db`)
 - **Auth demo**: header `x-user-id`
@@ -13,10 +13,17 @@ Plataforma socrática para acompañar el pensamiento del alumno.
 
 ```
 criterIA/
-├── src/                # frontend
+├── src/                # frontend (Vite)
+│   ├── components/ui/  # primitives shadcn
+│   ├── pages/
+│   │   ├── teacher/    # /profesor
+│   │   └── student/    # /estudiante
+│   ├── data/mockData.ts
+│   ├── hooks/
+│   └── lib/            # api (x-user-id), queryClient, utils
 ├── server/             # backend (proyecto independiente)
 │   └── src/
-│       ├── contracts.ts   # tipos compartidos, importados desde el FE con @contracts
+│       ├── contracts.ts   # tipos compartidos (importados desde el FE con @contracts)
 │       ├── schema.sql
 │       ├── seed.ts
 │       ├── server.ts
@@ -32,29 +39,38 @@ criterIA/
 ./setup.sh
 ```
 
-Instala las dependencias del frontend y del server, crea `server/.env` a
-partir del ejemplo, y seedea la base. Después editá `server/.env` y
-completá `ANTHROPIC_API_KEY`.
+Instala dependencias del frontend y del server, copia `server/.env` del
+ejemplo, y seedea la base. Después editá `server/.env` y completá
+`ANTHROPIC_API_KEY`.
 
-Requiere tener `bun` instalado (`curl -fsSL https://bun.sh/install | bash`).
+Requiere `bun` (`curl -fsSL https://bun.sh/install | bash`).
 
 ## Levantar en local
 
-```bash
-# terminal 1 — server
-cd server && npm run dev       # http://localhost:3001
+Un solo comando para correr ambos procesos:
 
-# terminal 2 — frontend
-bun run dev                    # http://localhost:5173
+```bash
+bun run dev:all
 ```
 
-El frontend proxya `/api` a `localhost:3001`.
+Levanta el frontend (Vite, http://localhost:5173) y el server
+(Fastify, http://localhost:3001) en paralelo. `Ctrl+C` cierra los dos.
+
+Si preferís terminales separadas:
+
+```bash
+# terminal 1 — server
+cd server && npm run dev
+
+# terminal 2 — frontend
+bun run dev
+```
 
 ## Auth demo
 
 Todas las rutas (excepto `/api/health`) requieren header `x-user-id`. El FE lo
-guarda en `localStorage` y tiene un selector en la UI para alternar entre los
-usuarios del seed:
+guarda en `localStorage`; hay un selector en el sidebar para alternar entre
+los usuarios del seed:
 
 - Docentes: `yairp`, `rosariom`
 - Alumnos: `sofiam`, `mateol`, `valentinag`, `thiagor`, `camilaf`, `benjamind`
