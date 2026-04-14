@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { nanoid } from 'nanoid';
 import { requireRole } from './auth.js';
 import { db } from './db.js';
 import type { Course, User } from './contracts.js';
@@ -41,40 +42,52 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'name and year_or_level are required' });
     }
 
-    const { nanoid } = await import('nanoid');
-
-    // Generate slug: "Historia" + "3ro A" → "historia-3ro-a"
+    // Generate slug: "Geografía" + "2do B" → "geografia-2do-b"
     const slugBase = (body.name + '-' + body.year_or_level)
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // remove accents
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-    // Ensure uniqueness
-    let id = slugBase;
-    const exists = db.prepare('SELECT id FROM courses WHERE id = ?').get(id);
-    if (exists) {
-      id = `${slugBase}-${nanoid(4)}`;
-    }
-
     const now = new Date().toISOString();
+    const studentUsernames = body.student_usernames ?? [];
 
-    db.prepare(
+    const insertCourse = db.prepare(
       `INSERT INTO courses (id, teacher_id, name, year_or_level, created_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).run(id, user.id, body.name.trim(), body.year_or_level.trim(), now);
-
-    // Insert students (silently skip usernames that don't exist or aren't students)
-    const insertStudent = db.prepare(
+    );
+    const insertCourseStudent = db.prepare(
       `INSERT OR IGNORE INTO course_students (course_id, student_id) VALUES (?, ?)`
     );
-    for (const username of body.student_usernames ?? []) {
-      const student = db
-        .prepare(`SELECT id FROM users WHERE id = ? AND role = 'student'`)
-        .get(username) as { id: string } | undefined;
-      if (student) {
-        insertStudent.run(id, student.id);
+    const lookupStudent = db.prepare(
+      `SELECT id FROM users WHERE id = ? AND role = 'student'`
+    );
+
+    const createCourse = db.transaction((courseId: string) => {
+      insertCourse.run(courseId, user!.id, body.name!.trim(), body.year_or_level!.trim(), now);
+      for (const username of studentUsernames) {
+        const student = lookupStudent.get(username) as { id: string } | undefined;
+        if (student) insertCourseStudent.run(courseId, student.id);
+      }
+    });
+
+    // Try primary slug, fall back to slug+nanoid on collision
+    let id = slugBase;
+    try {
+      createCourse(id);
+    } catch (err: unknown) {
+      const isUnique =
+        err instanceof Error && err.message.includes('UNIQUE constraint failed');
+      if (isUnique) {
+        id = `${slugBase}-${nanoid(4)}`;
+        try {
+          createCourse(id);
+        } catch {
+          return reply.code(500).send({ error: 'internal_error' });
+        }
+      } else {
+        return reply.code(500).send({ error: 'internal_error' });
       }
     }
 
