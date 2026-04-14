@@ -107,28 +107,34 @@ export async function sendAndCollect(
   // Stream-first, then send
   const stream = await (client.beta as any).sessions.events.stream(managedSessionId);
 
-  await (client.beta as any).sessions.events.send(managedSessionId, {
-    events: [
-      {
-        type: 'user.message',
-        content: [{ type: 'text', text }],
-      },
-    ],
-  });
-
   let responseText = '';
 
-  for await (const event of stream) {
-    if ((event as any).type === 'agent.message') {
-      for (const block of (event as any).content ?? []) {
-        if (block.type === 'text') {
-          responseText += block.text;
+  try {
+    await (client.beta as any).sessions.events.send(managedSessionId, {
+      events: [
+        {
+          type: 'user.message',
+          content: [{ type: 'text', text }],
+        },
+      ],
+    });
+
+    for await (const event of stream) {
+      if ((event as any).type === 'agent.message') {
+        for (const block of (event as any).content ?? []) {
+          if (block.type === 'text') {
+            responseText += block.text;
+          }
         }
+      } else if ((event as any).type === 'session.status_terminated') {
+        throw new Error('Managed Agent session terminated unexpectedly');
+      } else if ((event as any).type === 'session.status_idle') {
+        break;
       }
-    } else if ((event as any).type === 'session.status_terminated') {
-      throw new Error('Managed Agent session terminated unexpectedly');
-    } else if ((event as any).type === 'session.status_idle') {
-      break;
+    }
+  } finally {
+    if (typeof (stream as any).close === 'function') {
+      (stream as any).close();
     }
   }
 
@@ -148,63 +154,77 @@ export async function sendCloseAndCollect(
 
   const stream = await (client.beta as any).sessions.events.stream(managedSessionId);
 
-  await (client.beta as any).sessions.events.send(managedSessionId, {
-    events: [
-      {
-        type: 'user.message',
-        content: [
-          {
-            type: 'text',
-            text: 'El alumno decidió cerrar la sesión. Generá el reporte de cierre usando la herramienta submit_session_report.',
-          },
-        ],
-      },
-    ],
-  });
-
   let toolUseEvent: { id: string; input: any } | null = null;
   let fallbackText = '';
 
-  for await (const event of stream) {
-    if ((event as any).type === 'agent.custom_tool_use') {
-      const ev = event as any;
-      toolUseEvent = { id: ev.id, input: ev.input };
-    } else if ((event as any).type === 'agent.message') {
-      for (const block of (event as any).content ?? []) {
-        if (block.type === 'text') fallbackText += block.text;
-      }
-    } else if ((event as any).type === 'session.status_terminated') {
-      throw new Error('Managed Agent session terminated during close');
-    } else if ((event as any).type === 'session.status_idle') {
-      const ev = event as any;
-      if (ev.stop_reason?.type === 'requires_action' && toolUseEvent) {
-        // Agent called our custom tool — send confirmation and continue
-        await (client.beta as any).sessions.events.send(managedSessionId, {
-          events: [
+  try {
+    await (client.beta as any).sessions.events.send(managedSessionId, {
+      events: [
+        {
+          type: 'user.message',
+          content: [
             {
-              type: 'user.custom_tool_result',
-              custom_tool_use_id: toolUseEvent.id,
-              content: [{ type: 'text', text: 'Report received successfully.' }],
+              type: 'text',
+              text: 'El alumno decidió cerrar la sesión. Generá el reporte de cierre usando la herramienta submit_session_report.',
             },
           ],
-        });
-        continue; // wait for next idle (end_turn)
+        },
+      ],
+    });
+
+    for await (const event of stream) {
+      if ((event as any).type === 'agent.custom_tool_use') {
+        const ev = event as any;
+        toolUseEvent = { id: ev.id, input: ev.input };
+      } else if ((event as any).type === 'agent.message') {
+        for (const block of (event as any).content ?? []) {
+          if (block.type === 'text') fallbackText += block.text;
+        }
+      } else if ((event as any).type === 'session.status_terminated') {
+        throw new Error('Managed Agent session terminated during close');
+      } else if ((event as any).type === 'session.status_idle') {
+        const ev = event as any;
+        if (ev.stop_reason?.type === 'requires_action' && toolUseEvent) {
+          // Agent called our custom tool — send confirmation and continue
+          await (client.beta as any).sessions.events.send(managedSessionId, {
+            events: [
+              {
+                type: 'user.custom_tool_result',
+                custom_tool_use_id: toolUseEvent.id,
+                content: [{ type: 'text', text: 'Report received successfully.' }],
+              },
+            ],
+          });
+          continue; // wait for next idle (end_turn)
+        }
+        break; // end_turn — done
       }
-      break; // end_turn — done
+    }
+  } finally {
+    if (typeof (stream as any).close === 'function') {
+      (stream as any).close();
     }
   }
 
   if (toolUseEvent?.input) {
     const input = toolUseEvent.input;
+    const summary = typeof input.session_summary === 'string' ? input.session_summary : '';
+    const report = typeof input.teacher_report === 'string' ? input.teacher_report : '';
+    const ideas = Array.isArray(input.extracted_ideas) ? input.extracted_ideas : [];
+
+    if (!summary && !report) {
+      console.warn('[Socrates] submit_session_report tool returned empty summary and report');
+    }
+
     return {
-      session_summary: input.session_summary ?? '',
-      teacher_report: input.teacher_report ?? '',
-      extracted_ideas: (input.extracted_ideas ?? []).map(
-        (i: { text: string; question_that_triggered_it?: string }) => ({
+      session_summary: summary,
+      teacher_report: report,
+      extracted_ideas: ideas
+        .filter((i: any) => typeof i?.text === 'string')
+        .map((i: any) => ({
           text: i.text,
-          question_that_triggered_it: i.question_that_triggered_it ?? null,
-        })
-      ),
+          question_that_triggered_it: typeof i.question_that_triggered_it === 'string' ? i.question_that_triggered_it : null,
+        })),
     };
   }
 
