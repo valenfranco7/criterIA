@@ -72,7 +72,7 @@ function buildContextMessage(
     parts.push('');
     parts.push('## Previous Session Summaries');
     for (const prev of previousSessions.slice(-5)) {
-      const date = prev.completed_at ? new Date(prev.completed_at).toLocaleDateString('es-AR') : '';
+      const date = prev.completed_at ? new Date(prev.completed_at).toLocaleDateString('es-AR') : 'sin fecha';
       parts.push(`- "${prev.activity_title}" (${date}): ${prev.session_summary ?? 'No summary available.'}`);
     }
   }
