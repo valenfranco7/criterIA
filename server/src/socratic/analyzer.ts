@@ -38,7 +38,7 @@ ${historyText || '(sin historial previo)'}
 Último mensaje del alumno:
 ${input.student_message}`;
 
-  const response = await client.messages.create({
+  const response = await client.beta.promptCaching.messages.create({
     model: MODEL_ANALYZER,
     max_tokens: 256,
     temperature: 0,
@@ -46,8 +46,9 @@ ${input.student_message}`;
       {
         type: 'text',
         text: analyzerPrompt,
-      } as any,
-    ] as any,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
     messages: [{ role: 'user', content: userContent }],
   });
 
@@ -66,7 +67,8 @@ ${input.student_message}`;
       throw new Error('invalid shape');
     }
     return parsed;
-  } catch {
+  } catch (err) {
+    console.error('[Analyzer] JSON parse failed:', { error: String(err), raw: raw.substring(0, 200) });
     // Fallback: conservative defaults so the turn doesn't fail
     return { resistance_level: 0, blockage_level: 0, phase_action: 'stay' };
   }
