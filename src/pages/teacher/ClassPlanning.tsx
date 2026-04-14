@@ -1,165 +1,279 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { courses } from "@/data/mockData";
-import { ChevronRight, Upload, FileText, File, RefreshCw, Pencil, Check } from "lucide-react";
-
-const steps = ["Temas", "Material", "Estructura", "Actividad IA"];
+import { Loader2, Upload, X, Check } from "lucide-react";
+import type { ListCoursesResponse, Activity } from "@contracts";
 
 const ClassPlanning = () => {
-  const [step, setStep] = useState(0);
-  const [topics, setTopics] = useState("");
-  const [aiActivity, setAiActivity] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState(courses[0].id);
+  const navigate = useNavigate();
+
+  const { data: coursesData } = useQuery({
+    queryKey: ["teacher-courses"],
+    queryFn: () => apiFetch<ListCoursesResponse>("/api/teacher/courses"),
+  });
+
+  const courses = coursesData?.courses ?? [];
+
+  const [courseId, setCourseId] = useState("");
+  const [title, setTitle] = useState("");
+  const [topic, setTopic] = useState("");
+  const [objective, setObjective] = useState("");
+  const [initialQuestion, setInitialQuestion] = useState("");
+  const [successCriteria, setSuccessCriteria] = useState("");
+  const [referenceMaterial, setReferenceMaterial] = useState("");
+  const [duration, setDuration] = useState(30);
+
+  // File upload
+  const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL ?? ""}/api/teacher/upload`,
+        {
+          method: "POST",
+          headers: { "x-user-id": localStorage.getItem("criteria:user_id") ?? "" },
+          body: formData,
+        }
+      );
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      const data = await res.json();
+      setUploadedFileId(data.file_id);
+      setUploadedFileName(data.filename);
+    } catch (err) {
+      console.error("File upload failed:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const activity = await apiFetch<Activity>("/api/teacher/activities", {
+        method: "POST",
+        body: {
+          course_id: courseId,
+          title,
+          objective,
+          topic,
+          estimated_duration_minutes: duration,
+          config: {
+            initial_question: initialQuestion || undefined,
+            success_criteria: successCriteria || undefined,
+            reference_material: referenceMaterial || undefined,
+          },
+          anthropic_file_id: uploadedFileId,
+        },
+      });
+      // Auto-activate
+      await apiFetch(`/api/teacher/activities/${activity.id}/activate`, {
+        method: "POST",
+      });
+      return activity;
+    },
+    onSuccess: () => {
+      navigate("/profesor/actividades");
+    },
+  });
+
+  const canSubmit =
+    courseId && title.trim() && topic.trim() && objective.trim() && !createMutation.isPending;
 
   return (
-    <div className="animate-fade-in max-w-3xl">
-      <h2 className="text-2xl font-serif mb-6">Planificación de clase</h2>
+    <div className="animate-fade-in max-w-2xl">
+      <h2 className="text-2xl font-serif mb-2">Crear actividad</h2>
+      <p className="text-sm text-muted-foreground font-body mb-8">
+        Creá una actividad socrática para que tus alumnos trabajen antes de la clase.
+      </p>
 
-      <div className="flex items-center gap-2 mb-8">
-        {steps.map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            <button
-              onClick={() => setStep(i)}
-              className={`px-3 py-1.5 rounded-md text-sm font-body transition-colors ${
-                i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-muted text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              {s}
-            </button>
-            {i < steps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-          </div>
-        ))}
-      </div>
-
-      {step === 0 && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground font-body">¿Qué temas querés dar en esta clase?</p>
-          <textarea
-            value={topics}
-            onChange={(e) => setTopics(e.target.value)}
-            placeholder="Ej: La Semana de Mayo — causas inmediatas, protagonistas, el rol del Cabildo"
-            className="w-full h-32 px-4 py-3 rounded-md border border-input bg-background text-sm font-body resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <div className="flex justify-end">
-            <Button onClick={() => setStep(1)}>Siguiente</Button>
-          </div>
-        </div>
-      )}
-
-      {step === 1 && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground font-body">Subí material propio para esta clase (opcional).</p>
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-            <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground font-body">Arrastrá archivos acá o hacé click para seleccionar</p>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-3 rounded-md bg-card border border-border">
-              <FileText className="h-4 w-4 text-primary" />
-              <span className="text-sm font-body">Semana_de_Mayo_fuentes.pdf</span>
-              <span className="text-xs text-muted-foreground ml-auto font-body">2.4 MB</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-md bg-card border border-border">
-              <File className="h-4 w-4 text-primary" />
-              <span className="text-sm font-body">Cronologia_1810.docx</span>
-              <span className="text-xs text-muted-foreground ml-auto font-body">340 KB</span>
-            </div>
-          </div>
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(0)}>Atrás</Button>
-            <Button onClick={() => setStep(2)}>Generar estructura</Button>
-          </div>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg divide-y divide-border">
-            {[
-              { phase: "Inicio", time: "15 min", content: "Pregunta disparadora: '¿Qué harían ustedes si las decisiones sobre su vida las tomara alguien que vive a 10.000 km?' — Breve contextualización del estado de ánimo en Buenos Aires en mayo de 1810.", objectives: "Activar conocimientos previos. Generar empatía con el contexto." },
-              { phase: "Desarrollo", time: "45 min", content: "Lectura guiada de fuentes primarias (fragmentos de actas del Cabildo). Trabajo en grupos: cada grupo analiza la posición de un actor (Cisneros, Saavedra, Moreno, Castelli). Puesta en común: ¿por qué no todos querían lo mismo?", objectives: "Comprender la multicausalidad. Distinguir intereses de distintos actores." },
-              { phase: "Cierre", time: "20 min", content: "Síntesis colectiva: ¿fue inevitable la revolución? ¿Había alternativas? Registro escrito individual: 'Lo que más me sorprendió de esta clase'.", objectives: "Consolidar ideas. Ejercitar el pensamiento contrafáctico." },
-            ].map((block) => (
-              <div key={block.phase} className="p-5">
-                <div className="flex items-baseline justify-between mb-2">
-                  <h4 className="font-serif text-sm">{block.phase}</h4>
-                  <span className="text-xs text-muted-foreground font-body">{block.time}</span>
-                </div>
-                <p className="text-sm text-foreground font-body mb-2">{block.content}</p>
-                <p className="text-xs text-muted-foreground font-body italic">Objetivos: {block.objectives}</p>
-              </div>
+      <div className="space-y-6">
+        {/* Course */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">Curso</label>
+          <select
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body"
+          >
+            <option value="">Seleccioná un curso</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} — {c.year_or_level}
+              </option>
             ))}
-          </div>
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(1)}>Atrás</Button>
-            <Button onClick={() => setStep(3)}>Siguiente</Button>
-          </div>
+          </select>
         </div>
-      )}
 
-      {step === 3 && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between bg-card border border-border rounded-lg p-5">
-            <div>
-              <h4 className="font-serif text-sm">¿Actividad con IA para los alumnos?</h4>
-              <p className="text-xs text-muted-foreground font-body mt-1">
-                Generá una actividad socrática que los alumnos harán con el agente de IA
+        {/* Title */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Título de la actividad
+          </label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ej: La Revolución de Mayo desde tu mirada"
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Topic */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">Tema</label>
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Ej: Semana de Mayo — causas, protagonistas, rol del Cabildo"
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Objective */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Objetivo pedagógico
+          </label>
+          <textarea
+            value={objective}
+            onChange={(e) => setObjective(e.target.value)}
+            placeholder="Ej: Que el alumno construya su propio criterio sobre qué hace que una revolución sea inevitable."
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Initial question */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Pregunta inicial <span className="text-xs">(opcional)</span>
+          </label>
+          <input
+            value={initialQuestion}
+            onChange={(e) => setInitialQuestion(e.target.value)}
+            placeholder="Ej: ¿Por qué te parece que en 1810 no todos estaban de acuerdo?"
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground font-body mt-1">
+            Si no ponés una, Sócrates genera la primera pregunta según el perfil del alumno.
+          </p>
+        </div>
+
+        {/* Success criteria */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Criterio de éxito <span className="text-xs">(opcional)</span>
+          </label>
+          <input
+            value={successCriteria}
+            onChange={(e) => setSuccessCriteria(e.target.value)}
+            placeholder="Ej: El alumno identifica al menos dos intereses en tensión."
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Reference material text */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Material de referencia <span className="text-xs">(opcional, texto)</span>
+          </label>
+          <textarea
+            value={referenceMaterial}
+            onChange={(e) => setReferenceMaterial(e.target.value)}
+            placeholder="Contexto adicional que Sócrates puede usar durante la conversación..."
+            rows={3}
+            className="w-full px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* File upload */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Archivo de referencia <span className="text-xs">(opcional, PDF/DOC)</span>
+          </label>
+          {uploadedFileName ? (
+            <div className="flex items-center gap-3 p-3 rounded-md bg-card border border-border">
+              <Upload className="h-4 w-4 text-primary" />
+              <span className="text-sm font-body flex-1">{uploadedFileName}</span>
+              <button
+                onClick={() => {
+                  setUploadedFileId(null);
+                  setUploadedFileName(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <label className="block border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/30 transition-colors">
+              {uploading ? (
+                <Loader2 className="h-5 w-5 mx-auto text-muted-foreground animate-spin mb-1" />
+              ) : (
+                <Upload className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
+              )}
+              <p className="text-sm text-muted-foreground font-body">
+                {uploading ? "Subiendo..." : "Hacé click para seleccionar un archivo"}
               </p>
-            </div>
-            <button
-              onClick={() => setAiActivity(!aiActivity)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${aiActivity ? "bg-primary" : "bg-muted"}`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-primary-foreground shadow transition-transform ${aiActivity ? "left-6" : "left-0.5"}`} />
-            </button>
-          </div>
-
-          {aiActivity && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <label className="text-sm font-body text-muted-foreground mb-1 block">Curso destino</label>
-                <select
-                  value={selectedCourse}
-                  onChange={(e) => setSelectedCourse(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm font-body"
-                >
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-                <h4 className="font-serif text-sm">La Revolución de Mayo desde tu mirada</h4>
-                <div className="space-y-2 text-sm font-body">
-                  <p><span className="text-muted-foreground">Objetivo pedagógico:</span> Que los alumnos reconstruyan las motivaciones de los criollos en 1810 a partir de preguntas guiadas.</p>
-                  <p><span className="text-muted-foreground">Duración estimada:</span> 30 minutos</p>
-                  <p><span className="text-muted-foreground">Qué trabajarán:</span> El agente socrático guiará al alumno a conectar la exclusión política colonial con experiencias personales, para llegar por sí mismo a comprender por qué las revoluciones ocurren.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                  Regenerar
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Editar
-                </Button>
-                <Button size="sm">
-                  <Check className="h-3.5 w-3.5 mr-1.5" />
-                  Aprobar y guardar
-                </Button>
-              </div>
-            </div>
+              <input
+                type="file"
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt,.md"
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
           )}
-
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep(2)}>Atrás</Button>
-          </div>
         </div>
-      )}
+
+        {/* Duration */}
+        <div>
+          <label className="text-sm font-body text-muted-foreground mb-1.5 block">
+            Duración estimada (minutos)
+          </label>
+          <input
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            min={5}
+            max={120}
+            className="w-24 px-3 py-2.5 rounded-md border border-input bg-background text-sm font-body focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Submit */}
+        <div className="flex gap-3 pt-4 border-t border-border">
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={!canSubmit}
+            className="px-8"
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4 mr-2" />
+            )}
+            {createMutation.isPending ? "Creando..." : "Crear y activar"}
+          </Button>
+          {createMutation.isError && (
+            <p className="text-sm text-destructive font-body self-center">
+              Error al crear la actividad.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

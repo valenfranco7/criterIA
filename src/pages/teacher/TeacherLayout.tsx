@@ -3,7 +3,7 @@ import { BookOpen, FileText, Activity, Users, LogOut } from "lucide-react";
 
 const navItems = [
   { label: "Mis cursos", path: "/profesor/cursos", icon: BookOpen },
-  { label: "Planificación de clase", path: "/profesor/planificacion-clase", icon: FileText },
+  { label: "Crear actividad", path: "/profesor/planificacion-clase", icon: FileText },
   { label: "Actividades", path: "/profesor/actividades", icon: Activity },
   { label: "Panel de alumnos", path: "/profesor/alumnos", icon: Users },
 ];
