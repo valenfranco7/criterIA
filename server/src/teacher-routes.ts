@@ -138,13 +138,14 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
 
     const activity = db
-      .prepare(
-        "SELECT * FROM activities WHERE id = ? AND teacher_id = ? AND status = 'draft'"
-      )
+      .prepare('SELECT * FROM activities WHERE id = ? AND teacher_id = ?')
       .get(id, user.id) as any;
 
     if (!activity) {
-      return reply.code(404).send({ error: 'activity_not_found_or_not_draft' });
+      return reply.code(404).send({ error: 'not_found' });
+    }
+    if (activity.status !== 'draft') {
+      return reply.code(400).send({ error: 'activity_not_draft' });
     }
 
     db.prepare("UPDATE activities SET status = 'active' WHERE id = ?").run(id);
@@ -260,7 +261,7 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       (db
         .prepare('SELECT * FROM student_profiles WHERE student_id = ?')
         .get(studentId) as any) ??
-      { student_id: studentId, summary: '', updated_at: '' };
+      { student_id: studentId, summary: '', updated_at: new Date().toISOString() };
 
     const sessionRows = db
       .prepare(
