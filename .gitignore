@@ -11,3 +11,5 @@ build/
 *.db-shm
 .vscode/
 .idea/
+.playwright-mcp/
+.vite/

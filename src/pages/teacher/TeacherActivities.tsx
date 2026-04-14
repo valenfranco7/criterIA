@@ -1,20 +1,101 @@
 import { useState } from "react";
-import { activities, courses } from "@/data/mockData";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Play, Eye, Users, Calendar } from "lucide-react";
+import { Play, Eye, Users, Calendar, Loader2, FileText } from "lucide-react";
+import type {
+  Activity,
+  ListActivitiesResponse,
+  ListCoursesResponse,
+  ActivitySummary,
+} from "@contracts";
 
 type Tab = "pending" | "active" | "finished";
 
+// The API returns Activity + session counts
+interface ActivityWithCounts extends Activity {
+  completed_count: number;
+  total_count: number;
+}
+
+interface ActivitiesResponse {
+  pending: ActivityWithCounts[];
+  active: ActivityWithCounts[];
+  finished: ActivityWithCounts[];
+}
+
 const TeacherActivities = () => {
   const [tab, setTab] = useState<Tab>("pending");
+  const queryClient = useQueryClient();
+
+  const {
+    data: activitiesData,
+    isLoading: activitiesLoading,
+    isError: activitiesError,
+  } = useQuery<ActivitiesResponse>({
+    queryKey: ["teacher-activities"],
+    queryFn: () => apiFetch<ActivitiesResponse>("/api/teacher/activities"),
+  });
+
+  const { data: coursesData } = useQuery<ListCoursesResponse>({
+    queryKey: ["teacher-courses"],
+    queryFn: () => apiFetch<ListCoursesResponse>("/api/teacher/courses"),
+  });
+
+  const courseMap = new Map<string, string>(
+    (coursesData?.courses ?? []).map((c) => [c.id, c.name])
+  );
+
+  const activateMutation = useMutation({
+    mutationFn: (activityId: string) =>
+      apiFetch<Activity>(`/api/teacher/activities/${activityId}/activate`, {
+        method: "POST",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teacher-activities"] });
+    },
+  });
+
+  const summarizeMutation = useMutation({
+    mutationFn: (activityId: string) =>
+      apiFetch<ActivitySummary>(
+        `/api/teacher/activities/${activityId}/generate-summary`,
+        { method: "POST" }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teacher-activities"] });
+    },
+  });
+
+  if (activitiesLoading) {
+    return (
+      <div className="animate-fade-in flex items-center gap-2 text-muted-foreground font-body mt-10">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Cargando actividades…
+      </div>
+    );
+  }
+
+  if (activitiesError || !activitiesData) {
+    return (
+      <div className="animate-fade-in text-destructive font-body mt-10">
+        Error al cargar las actividades. Intente de nuevo más tarde.
+      </div>
+    );
+  }
 
   const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "pending", label: "Pendientes", count: activities.pending.length },
-    { key: "active", label: "En curso", count: activities.active.length },
-    { key: "finished", label: "Finalizadas", count: activities.finished.length },
+    { key: "pending", label: "Pendientes", count: activitiesData.pending.length },
+    { key: "active", label: "En curso", count: activitiesData.active.length },
+    { key: "finished", label: "Finalizadas", count: activitiesData.finished.length },
   ];
 
-  const items = tab === "pending" ? activities.pending : tab === "active" ? activities.active : activities.finished;
+  const items: ActivityWithCounts[] =
+    tab === "pending"
+      ? activitiesData.pending
+      : tab === "active"
+      ? activitiesData.active
+      : activitiesData.finished;
 
   return (
     <div className="animate-fade-in">
@@ -26,7 +107,9 @@ const TeacherActivities = () => {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 rounded-md text-sm font-body transition-colors ${
-              tab === t.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              tab === t.key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t.label}
@@ -36,44 +119,95 @@ const TeacherActivities = () => {
       </div>
 
       <div className="space-y-3">
-        {items.map((act) => (
-          <div key={act.id} className="bg-card border border-border rounded-lg p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-serif text-base">{act.title}</h3>
-                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-body">
-                  <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{act.course}</span>
-                  <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{act.datePlanned}</span>
-                </div>
-                <p className="text-sm text-muted-foreground font-body mt-2">{act.objective}</p>
-              </div>
-              <div className="text-right">
-                <div className="text-sm font-body text-muted-foreground">
-                  {act.completed}/{act.total} completaron
-                </div>
-                {tab === "pending" && (
-                  <div className="mt-3 space-y-2">
-                    <select className="w-full px-2 py-1 rounded border border-input bg-background text-xs font-body">
-                      {courses.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                    <Button size="sm" className="w-full">
-                      <Play className="h-3.5 w-3.5 mr-1.5" />
-                      Activar ahora
-                    </Button>
+        {items.length === 0 && (
+          <p className="text-sm text-muted-foreground font-body">
+            No hay actividades en esta sección.
+          </p>
+        )}
+
+        {items.map((act) => {
+          const isActivating =
+            activateMutation.isPending && activateMutation.variables === act.id;
+          const isSummarizing =
+            summarizeMutation.isPending && summarizeMutation.variables === act.id;
+
+          return (
+            <div key={act.id} className="bg-card border border-border rounded-lg p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-serif text-base">{act.title}</h3>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-body">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5" />
+                      {courseMap.get(act.course_id) ?? act.course_id}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {new Date(act.created_at).toLocaleDateString("es-AR")}
+                    </span>
                   </div>
-                )}
-                {tab === "finished" && (
-                  <Button variant="outline" size="sm" className="mt-3">
-                    <Eye className="h-3.5 w-3.5 mr-1.5" />
-                    Ver resultados
-                  </Button>
-                )}
+                  <p className="text-sm text-muted-foreground font-body mt-2">
+                    {act.objective}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-sm font-body text-muted-foreground">
+                    {act.completed_count}/{act.total_count} completaron
+                  </div>
+
+                  {tab === "pending" && (
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={isActivating}
+                        onClick={() => activateMutation.mutate(act.id)}
+                      >
+                        {isActivating ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Activar ahora
+                      </Button>
+                    </div>
+                  )}
+
+                  {tab === "active" && (
+                    <Button variant="outline" size="sm" className="mt-3">
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      Ver resultados
+                    </Button>
+                  )}
+
+                  {tab === "finished" && (
+                    <div className="mt-3 space-y-2">
+                      <Button variant="outline" size="sm" className="w-full">
+                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                        Ver resultados
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        disabled={isSummarizing}
+                        onClick={() => summarizeMutation.mutate(act.id)}
+                      >
+                        {isSummarizing ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <FileText className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Generar resumen
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
