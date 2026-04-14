@@ -78,7 +78,13 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       )
       .all(courseId);
 
-    reply.send({ course, students });
+    const analyticsRow = db
+      .prepare('SELECT analysis FROM course_analytics WHERE course_id = ?')
+      .get(courseId) as { analysis: string } | undefined;
+
+    const analytics = analyticsRow ? jsonParse(analyticsRow.analysis, null) : null;
+
+    reply.send({ course, students, analytics });
   });
 
   // POST /api/teacher/class-plans → ClassPlan
@@ -237,6 +243,7 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     const sessions = sessionRows.map((s) => ({
       ...s,
       extracted_ideas: jsonParse(s.extracted_ideas, []),
+      difficult_topics: jsonParse(s.difficult_topics, []),
     }));
 
     const latestSummary =
@@ -248,6 +255,10 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
            LIMIT 1`
         )
         .get(id) as any) ?? null;
+
+    if (latestSummary) {
+      latestSummary.analysis = jsonParse(latestSummary.analysis, null);
+    }
 
     reply.send({
       activity: { ...activity, config: jsonParse(activity.config, {}) },
@@ -325,6 +336,13 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       new Date().toISOString()
     );
 
+    // Fire-and-forget: update course analytics
+    import('./course-analyst.js').then(({ runCourseAnalyst }) => {
+      runCourseAnalyst(activityRow.course_id).catch((err: any) =>
+        console.error('[generate-summary] Course analyst failed:', err)
+      );
+    });
+
     return reply.send({
       summary: {
         id: summaryId,
@@ -382,6 +400,7 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     const sessions = sessionRows.map((s) => ({
       ...s,
       extracted_ideas: jsonParse(s.extracted_ideas, []),
+      difficult_topics: jsonParse(s.difficult_topics, []),
     }));
 
     reply.send({ student, profile, sessions });
