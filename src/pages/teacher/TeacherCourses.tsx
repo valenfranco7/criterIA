@@ -52,12 +52,12 @@ const TeacherCourses = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<CoursesResponse>({
+  const { data, isLoading, isError } = useQuery<CoursesResponse>({
     queryKey: ["teacher-courses"],
     queryFn: () => apiFetch("/api/teacher/courses"),
   });
 
-  const { data: studentsData } = useQuery<StudentsResponse>({
+  const { data: studentsData, isLoading: studentsLoading } = useQuery<StudentsResponse>({
     queryKey: ["all-students"],
     queryFn: () => apiFetch("/api/teacher/students"),
     enabled: open,
@@ -106,7 +106,6 @@ const TeacherCourses = () => {
       });
       await queryClient.invalidateQueries({ queryKey: ["teacher-courses"] });
       setOpen(false);
-      resetForm();
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Error al crear el curso.";
@@ -181,7 +180,9 @@ const TeacherCourses = () => {
                 />
                 {studentSearch.trim() && (
                   <div className="border border-border rounded-md max-h-40 overflow-y-auto">
-                    {filteredStudents.length === 0 ? (
+                    {studentsLoading ? (
+                      <p className="text-sm text-muted-foreground px-3 py-2">Cargando...</p>
+                    ) : filteredStudents.length === 0 ? (
                       <p className="text-sm text-muted-foreground px-3 py-2">
                         Sin resultados
                       </p>
@@ -218,6 +219,8 @@ const TeacherCourses = () => {
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Cargando cursos...</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">No se pudieron cargar los cursos. Intentá de nuevo.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(data?.courses ?? []).map((course) => (
@@ -241,7 +244,7 @@ const TeacherCourses = () => {
               </div>
             </button>
           ))}
-          {(data?.courses ?? []).length === 0 && !isLoading && (
+          {(data?.courses ?? []).length === 0 && (
             <p className="text-sm text-muted-foreground col-span-2">
               No tenés cursos aún. Creá uno con el botón "Nuevo curso".
             </p>
