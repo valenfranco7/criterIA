@@ -3,7 +3,8 @@ import { requireRole } from './auth.js';
 import { db, jsonParse, jsonStringify } from './db.js';
 import { nanoid } from 'nanoid';
 import type { CreateActivityRequest } from './contracts.js';
-import { summarizeActivity, refreshStudentProfile } from './teacher-agents.js';
+import { summarizeActivity } from './teacher-agents.js';
+import { refreshStudentProfile } from './profile-updater.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
   // GET /api/teacher/courses → { courses: Course[] }
