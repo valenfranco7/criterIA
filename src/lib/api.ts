@@ -27,11 +27,13 @@ export async function apiFetch<T>(
   path: string,
   opts: { method?: string; body?: unknown } = {}
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    'content-type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
   const uid = getUserId();
   if (uid) headers['x-user-id'] = uid;
+
+  if (opts.body !== undefined) {
+    headers['content-type'] = 'application/json';
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     method: opts.method ?? 'GET',
