@@ -5,8 +5,36 @@ import { nanoid } from 'nanoid';
 import type { CreateActivityRequest } from './contracts.js';
 import { runClassAnalyst } from './class-analyst.js';
 import { refreshStudentProfile } from './profile-updater.js';
+import { requireAnthropic } from './anthropic.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
+  // POST /api/teacher/upload — upload file to Anthropic Files API
+  app.post('/upload', async (req, reply) => {
+    const user = await requireRole(req, reply, 'teacher');
+    if (!user) return;
+
+    const data = await req.file();
+    if (!data) {
+      return reply.code(400).send({ error: 'No file uploaded' });
+    }
+
+    const client = requireAnthropic();
+    const buffer = await data.toBuffer();
+    const blob = new Blob([buffer], { type: data.mimetype });
+    const file = new File([blob], data.filename, { type: data.mimetype });
+
+    try {
+      const uploaded = await (client.beta as any).files.upload({
+        file,
+        purpose: 'agent',
+      });
+      return reply.send({ file_id: uploaded.id, filename: data.filename });
+    } catch (err) {
+      console.error('[upload] Failed to upload to Anthropic:', err);
+      return reply.code(502).send({ error: 'Failed to upload file' });
+    }
+  });
+
   // GET /api/teacher/courses → { courses: Course[] }
   app.get('/courses', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
@@ -110,8 +138,8 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
     db.prepare(
       `INSERT INTO activities
          (id, teacher_id, course_id, class_plan_id, title, objective, topic,
-          estimated_duration_minutes, status, config, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`
+          estimated_duration_minutes, status, config, anthropic_file_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`
     ).run(
       id,
       user.id,
@@ -122,6 +150,7 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       body.topic,
       body.estimated_duration_minutes,
       jsonStringify(body.config ?? {}),
+      body.anthropic_file_id ?? null,
       now
     );
 

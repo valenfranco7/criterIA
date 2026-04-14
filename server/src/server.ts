@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import { requireUser } from './auth.js';
 import type { MeResponse } from './contracts.js';
 import { registerTeacherRoutes } from './teacher-routes.js';
@@ -13,6 +14,8 @@ async function main() {
     origin: ['http://localhost:5173'],
     credentials: true,
   });
+
+  await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } });
 
   app.get('/api/health', async () => ({
     status: 'ok',
