@@ -156,11 +156,17 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     const activity = parseActivity(activityRow);
 
     const existing = db
-      .prepare('SELECT id FROM activity_sessions WHERE activity_id = ? AND student_id = ?')
-      .get(activityId, user.id);
+      .prepare('SELECT id, status FROM activity_sessions WHERE activity_id = ? AND student_id = ?')
+      .get(activityId, user.id) as { id: string; status: string } | undefined;
 
     if (existing) {
-      return reply.code(409).send({ error: 'session already exists' });
+      if (existing.status === 'not_started') {
+        // Clean up stale seed session — delete messages and session, then proceed
+        db.prepare('DELETE FROM messages WHERE session_id = ?').run(existing.id);
+        db.prepare('DELETE FROM activity_sessions WHERE id = ?').run(existing.id);
+      } else {
+        return reply.code(409).send({ error: 'session already exists' });
+      }
     }
 
     // Load student context
