@@ -1,12 +1,26 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from './auth.js';
+import { db } from './db.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
   // GET /api/teacher/courses → { courses: Course[] }
   app.get('/courses', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
-    reply.code(501).send({ error: 'not_implemented' });
+
+    const rows = db
+      .prepare(
+        `SELECT c.*,
+                COUNT(cs.student_id) AS student_count
+         FROM courses c
+         LEFT JOIN course_students cs ON cs.course_id = c.id
+         WHERE c.teacher_id = ?
+         GROUP BY c.id
+         ORDER BY c.created_at DESC`
+      )
+      .all(user.id) as Array<Record<string, unknown>>;
+
+    return { courses: rows };
   });
 
   // POST /api/teacher/courses → CreateCourseRequest
