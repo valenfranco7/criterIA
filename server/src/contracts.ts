@@ -170,6 +170,7 @@ export interface ListCoursesResponse {
 export interface CourseDetailResponse {
   course: Course;
   students: User[];
+  analytics: CourseAnalytics | null;
 }
 
 export interface PlanClassResponse {
@@ -257,4 +258,36 @@ export interface ClassAnalysis {
   }>;
   class_summary: string;
   suggested_plan: string;
+}
+
+export interface CourseAnalytics {
+  course_comprehension_avg: number;
+  student_rankings: Array<{
+    student_id: string;
+    name: string;
+    comprehension_avg: number;
+    trend: 'improving' | 'stable' | 'declining';
+    main_strengths: string;
+    main_difficulties: string;
+  }>;
+  accumulated_difficult_topics: Array<{
+    topic: string;
+    frequency: number;
+    description: string;
+  }>;
+  suggested_groups: Array<{
+    group_name: string;
+    student_ids: string[];
+    topic: string;
+    rationale: string;
+  }>;
+  course_summary: string;
+}
+
+export interface CourseAnalyticsRow {
+  id: string;
+  course_id: string;
+  analysis: CourseAnalytics;
+  created_at: string;
+  updated_at: string;
 }

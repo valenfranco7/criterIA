@@ -116,3 +116,12 @@ CREATE TABLE activity_summaries (
   analysis TEXT,
   created_at TEXT NOT NULL
 );
+
+-- 11. course_analytics
+CREATE TABLE course_analytics (
+  id TEXT PRIMARY KEY,
+  course_id TEXT NOT NULL UNIQUE REFERENCES courses(id),
+  analysis TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);

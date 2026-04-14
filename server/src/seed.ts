@@ -3,6 +3,7 @@ import { db, applySchema } from './db.js';
 
 // Fresh DB every seed: drop all tables then re-apply schema.sql.
 const tables = [
+  'course_analytics',
   'activity_summaries',
   'student_profiles',
   'student_ideas',
