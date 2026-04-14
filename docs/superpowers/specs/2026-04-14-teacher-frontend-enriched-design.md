@@ -22,7 +22,7 @@ Automatically after `POST /api/teacher/activities/:id/generate-summary` succeeds
 
 ### Input
 
-All `activity_summaries` for the course (each has a `ClassAnalysis` in the `analysis` column) + all student profiles for students in the course.
+All `activity_summaries` for the course (each has a `ClassAnalysis` in the `analysis` column) + all individual `activity_sessions` with `comprehension_pct` and `completed_at` per student (needed for trend calculation) + all student profiles for students in the course.
 
 ```
 Course: Historia 3ro A
@@ -91,7 +91,7 @@ CREATE TABLE course_analytics (
 );
 ```
 
-`UNIQUE` on `course_id` — one analytics row per course. Use INSERT OR REPLACE.
+`UNIQUE` on `course_id` — one analytics row per course. Use `INSERT ... ON CONFLICT(course_id) DO UPDATE SET analysis = excluded.analysis, updated_at = excluded.updated_at` to preserve `created_at`.
 
 ### contracts.ts additions
 
@@ -137,12 +137,29 @@ export interface CourseAnalyticsRow {
 
 ### Modified: `server/src/teacher-routes.ts`
 
-1. After `generate-summary` succeeds, fire-and-forget `runCourseAnalyst(courseId)` to update course analytics.
-2. New endpoint: `GET /api/teacher/courses/:courseId/analytics` — returns the latest `course_analytics` row for the course.
+1. After `generate-summary` succeeds, fire-and-forget `runCourseAnalyst(courseId)` to update course analytics. On failure, log the error — no retry needed (next generate-summary will re-trigger).
+2. `GET /api/teacher/courses/:courseId` — already returns course + students. Add `analytics: CourseAnalytics | null` to the response by joining `course_analytics` table. This is the single source for the frontend — **no separate analytics endpoint** (avoids redundancy).
 
-### Modified: `server/src/teacher-routes.ts` (existing endpoint)
+### JSON column parsing
 
-`GET /api/teacher/courses/:courseId` — already returns course + students. Add `analytics: CourseAnalytics | null` to the response.
+All JSON columns (`analysis`, `difficult_topics`, `extracted_ideas`) must be parsed **in the backend** before sending to the frontend. Specifically:
+- `activity_summaries.analysis` → parse with `jsonParse()` before including in response
+- `activity_sessions.difficult_topics` → parse in `GET /api/teacher/students/:id` response (currently missing)
+- `course_analytics.analysis` → parse before including in course detail response
+
+### Frontend data freshness
+
+After clicking "Generar resumen", the frontend should show the ClassAnalysis immediately (it's in the response). The CourseAnalytics updates in background — the StudentPanel should display whatever is in the DB. If the teacher navigates to StudentPanel immediately after, they see the previous analytics (or empty if first time). A "last updated" timestamp is shown so the teacher knows how fresh the data is. No polling needed — the analytics refresh is fast enough that by the time the teacher navigates, it's usually done.
+
+### Updated CourseDetailResponse in contracts.ts
+
+```ts
+export interface CourseDetailResponse {
+  course: Course;
+  students: User[];
+  analytics: CourseAnalytics | null;
+}
+```
 
 ## 5. Frontend changes
 
@@ -191,7 +208,7 @@ When an activity has a summary with `analysis`, show it inline or in an expandab
 - Grupos sugeridos (cards)
 - Plan sugerido (markdown rendered)
 
-Data source: `GET /api/teacher/activities/:id` → `latest_summary.analysis`
+Data source: fetch on-demand when expanding an activity — `GET /api/teacher/activities/:id` → `latest_summary.analysis` (parsed as `ClassAnalysis` by the backend). The activity list endpoint does NOT include analysis — it's fetched per-activity when the teacher expands the detail.
 
 ### StudentProfile.tsx — enrich session history
 
@@ -207,10 +224,9 @@ Data source: already in the `sessions` array from `GET /api/teacher/students/:id
 | Endpoint | Change |
 |---|---|
 | `GET /api/teacher/courses/:courseId` | Add `analytics: CourseAnalytics \| null` to response |
-| `GET /api/teacher/courses/:courseId/analytics` | NEW — returns course analytics |
 | `POST /api/teacher/activities/:id/generate-summary` | After success, fire-and-forget `runCourseAnalyst` |
-| `GET /api/teacher/activities/:id` | Already returns `latest_summary` with `analysis` — no change needed |
-| `GET /api/teacher/students/:id` | Already returns sessions — frontend reads `comprehension_pct` and `difficult_topics` from there |
+| `GET /api/teacher/activities/:id` | Parse `analysis` JSON before sending (currently raw string) |
+| `GET /api/teacher/students/:id` | Parse `difficult_topics` JSON for each session before sending |
 
 ## 7. Files — summary
 
