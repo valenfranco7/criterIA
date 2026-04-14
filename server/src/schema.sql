@@ -63,7 +63,8 @@ CREATE TABLE activity_sessions (
   completed_at TEXT,
   session_summary TEXT,
   teacher_report TEXT,
-  extracted_ideas TEXT DEFAULT '[]'
+  extracted_ideas TEXT DEFAULT '[]',
+  managed_session_id TEXT
 );
 CREATE INDEX idx_sessions_by_student ON activity_sessions(student_id);
 CREATE INDEX idx_sessions_by_activity ON activity_sessions(activity_id);

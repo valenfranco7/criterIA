@@ -78,6 +78,7 @@ export interface ActivitySession {
   session_summary: string | null;
   teacher_report: string | null;
   extracted_ideas: ExtractedIdea[];
+  managed_session_id: string | null;
 }
 
 export interface Message {
