@@ -56,7 +56,7 @@ const Index = () => {
             onClick={enterAsTeacher}
             className="text-base px-10 py-6 font-body bg-foreground text-background hover:bg-foreground/90"
           >
-            Entrar como Yair (profesor)
+            Entrar como profesor
           </Button>
           <Button
             variant="outline"
@@ -64,7 +64,7 @@ const Index = () => {
             onClick={enterAsStudent}
             className="text-base px-10 py-6 font-body border-border hover:bg-accent"
           >
-            Entrar como Sofía (alumna)
+            Entrar como estudiante
           </Button>
         </div>
       </div>
