@@ -1,12 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { requireRole } from './auth.js';
 import { db } from './db.js';
+import type { Course } from './contracts.js';
 
 export async function registerTeacherRoutes(app: FastifyInstance) {
   // GET /api/teacher/courses → { courses: Course[] }
   app.get('/courses', async (req, reply) => {
     const user = await requireRole(req, reply, 'teacher');
     if (!user) return;
+
+    type CourseWithCount = Course & { student_count: number };
 
     const rows = db
       .prepare(
@@ -18,7 +21,7 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
          GROUP BY c.id
          ORDER BY c.created_at DESC`
       )
-      .all(user.id) as Array<Record<string, unknown>>;
+      .all(user.id) as CourseWithCount[];
 
     return { courses: rows };
   });
