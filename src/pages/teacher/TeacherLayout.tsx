@@ -65,7 +65,7 @@ const TeacherLayout = () => {
 
       <main className="flex-1 flex flex-col">
         <header className="px-8 py-5 border-b border-border">
-          <h1 className="text-xl font-serif">Panel del docente</h1>
+          <h1 className="text-xl font-serif">Hola, Yair</h1>
           <p className="text-sm text-muted-foreground font-body capitalize">{today}</p>
         </header>
         <div className="flex-1 overflow-auto p-8">
