@@ -2,8 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { nanoid } from 'nanoid';
 import { requireRole } from './auth.js';
 import { db, jsonParse, jsonStringify } from './db.js';
-import { runTurn } from './socratic/engine.js';
-import { closeSession } from './socratic/closer.js';
+import {
+  createManagedSession,
+  sendAndCollect,
+  sendCloseAndCollect,
+  archiveSession,
+} from './socratic/agent.js';
 import type {
   Activity,
   ActivityConfig,
@@ -12,6 +16,7 @@ import type {
   Message,
   StudentIdea,
   Course,
+  StudentProfile,
   ListStudentActivitiesResponse,
   ListStudentCoursesResponse,
   ListStudentIdeasResponse,
@@ -22,36 +27,73 @@ import type {
   SendMessageRequest,
 } from './contracts.js';
 
-// Helper: parse a raw DB row into a typed ActivitySession
 function parseSession(row: Record<string, unknown>): ActivitySession {
   return {
-    ...(row as Omit<ActivitySession, 'extracted_ideas'>),
-    extracted_ideas: jsonParse<ExtractedIdea[]>(
-      row.extracted_ideas as string,
-      []
-    ),
+    ...(row as unknown as Omit<ActivitySession, 'extracted_ideas'>),
+    extracted_ideas: jsonParse<ExtractedIdea[]>(row.extracted_ideas as string, []),
   };
 }
 
-// Helper: parse a raw DB row into a typed Activity
 function parseActivity(row: Record<string, unknown>): Activity {
   return {
-    ...(row as Omit<Activity, 'config'>),
+    ...(row as unknown as Omit<Activity, 'config'>),
     config: jsonParse<ActivityConfig>(row.config as string, {}),
   };
 }
 
-// Helper: parse a raw DB row into a typed Message
 function parseMessage(row: Record<string, unknown>): Message {
   return row as unknown as Message;
 }
 
-// Helper: parse a raw DB row into a typed StudentIdea
 function parseStudentIdea(row: Record<string, unknown>): StudentIdea {
   return {
-    ...(row as Omit<StudentIdea, 'connections'>),
+    ...(row as unknown as Omit<StudentIdea, 'connections'>),
     connections: jsonParse<string[]>(row.connections as string, []),
   };
+}
+
+function buildContextMessage(
+  student: { id: string; name: string },
+  profile: StudentProfile | null,
+  previousSessions: Array<{ session_summary: string | null; activity_title: string; completed_at: string | null }>,
+  activity: Activity
+): string {
+  const parts: string[] = [];
+
+  parts.push('## Student Profile');
+  parts.push(`Name: ${student.name}`);
+  if (profile?.summary) {
+    parts.push(`Profile: ${profile.summary}`);
+  } else {
+    parts.push('Profile: No detailed profile yet. This may be an early session.');
+  }
+
+  if (previousSessions.length > 0) {
+    parts.push('');
+    parts.push('## Previous Session Summaries');
+    for (const prev of previousSessions.slice(-5)) {
+      const date = prev.completed_at ? new Date(prev.completed_at).toLocaleDateString('es-AR') : '';
+      parts.push(`- "${prev.activity_title}" (${date}): ${prev.session_summary ?? 'No summary available.'}`);
+    }
+  }
+
+  parts.push('');
+  parts.push('## Current Activity');
+  parts.push(`Title: ${activity.title}`);
+  parts.push(`Topic: ${activity.topic}`);
+  parts.push(`Objective: ${activity.objective}`);
+  if (activity.config.success_criteria) {
+    parts.push(`Success criteria: ${activity.config.success_criteria}`);
+  }
+  if (activity.config.reference_material) {
+    parts.push(`Reference material: ${activity.config.reference_material}`);
+  }
+
+  parts.push('');
+  parts.push('---');
+  parts.push('Begin the conversation with the student. Your first message should engage them with the topic in a way that connects to what you know about how they think.');
+
+  return parts.join('\n');
 }
 
 export async function registerStudentRoutes(app: FastifyInstance) {
@@ -61,9 +103,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     if (!user) return;
 
     const courseRows = db
-      .prepare(
-        `SELECT course_id FROM course_students WHERE student_id = ?`
-      )
+      .prepare('SELECT course_id FROM course_students WHERE student_id = ?')
       .all(user.id) as Array<{ course_id: string }>;
 
     if (courseRows.length === 0) {
@@ -75,19 +115,14 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const activities = (
       db
-        .prepare(
-          `SELECT * FROM activities WHERE course_id IN (${placeholders}) AND status = 'active' ORDER BY created_at DESC`
-        )
+        .prepare(`SELECT * FROM activities WHERE course_id IN (${placeholders}) AND status = 'active' ORDER BY created_at DESC`)
         .all(...courseIds) as Record<string, unknown>[]
     ).map(parseActivity);
 
     const items = activities.map((activity) => {
       const sessionRow = db
-        .prepare(
-          `SELECT * FROM activity_sessions WHERE activity_id = ? AND student_id = ? LIMIT 1`
-        )
+        .prepare('SELECT * FROM activity_sessions WHERE activity_id = ? AND student_id = ? LIMIT 1')
         .get(activity.id, user.id) as Record<string, unknown> | undefined;
-
       return {
         activity,
         session: sessionRow ? parseSession(sessionRow) : null,
@@ -118,39 +153,71 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const activity = parseActivity(activityRow);
 
-    // Check not already started
     const existing = db
-      .prepare(
-        `SELECT id FROM activity_sessions WHERE activity_id = ? AND student_id = ?`
-      )
+      .prepare('SELECT id FROM activity_sessions WHERE activity_id = ? AND student_id = ?')
       .get(activityId, user.id);
 
     if (existing) {
       return reply.code(409).send({ error: 'session already exists' });
     }
 
+    // Load student context
+    const profileRow = db
+      .prepare('SELECT * FROM student_profiles WHERE student_id = ?')
+      .get(user.id) as { summary: string; updated_at: string } | undefined;
+
+    const previousSessions = db
+      .prepare(
+        `SELECT s.session_summary, s.completed_at, a.title as activity_title
+         FROM activity_sessions s
+         JOIN activities a ON a.id = s.activity_id
+         WHERE s.student_id = ? AND s.status = 'completed'
+         ORDER BY s.completed_at DESC LIMIT 5`
+      )
+      .all(user.id) as Array<{ session_summary: string | null; activity_title: string; completed_at: string | null }>;
+
+    const contextMessage = buildContextMessage(
+      { id: user.id, name: user.name },
+      profileRow ? { student_id: user.id, summary: profileRow.summary, updated_at: profileRow.updated_at } : null,
+      previousSessions.reverse(),
+      activity
+    );
+
+    // Create Managed Agent session
+    let managedSessionId: string;
+    try {
+      managedSessionId = await createManagedSession();
+    } catch (err) {
+      console.error('[start] Failed to create managed session:', err);
+      return reply.code(503).send({ error: 'Failed to create agent session' });
+    }
+
     const sessionId = nanoid();
     const now = new Date().toISOString();
 
-    // First assistant message: use initial_question from config or generic opener
-    const firstMessage =
-      activity.config.initial_question ??
-      '¿Qué es lo que ya sabés sobre este tema?';
-
     db.prepare(
       `INSERT INTO activity_sessions
-       (id, activity_id, student_id, status, current_phase, phase_turn_count, started_at, completed_at, session_summary, teacher_report, extracted_ideas)
-       VALUES (?, ?, ?, 'in_progress', 'anchoring', 0, ?, NULL, NULL, NULL, '[]')`
-    ).run(sessionId, activityId, user.id, now);
+       (id, activity_id, student_id, status, current_phase, phase_turn_count, started_at, completed_at, session_summary, teacher_report, extracted_ideas, managed_session_id)
+       VALUES (?, ?, ?, 'in_progress', 'anchoring', 0, ?, NULL, NULL, NULL, '[]', ?)`
+    ).run(sessionId, activityId, user.id, now, managedSessionId);
+
+    // Send context and get first message
+    let firstMessage: string;
+    try {
+      firstMessage = await sendAndCollect(managedSessionId, contextMessage);
+    } catch (err) {
+      console.error('[start] Failed to get first message from agent:', err);
+      firstMessage = '¿Qué es lo que ya sabés sobre este tema?';
+    }
 
     const msgId = nanoid();
     db.prepare(
       `INSERT INTO messages (id, session_id, turn_index, role, content, phase_at_turn, analyzer_json, created_at)
-       VALUES (?, ?, 0, 'assistant', ?, 'anchoring', NULL, ?)`
+       VALUES (?, ?, 0, 'assistant', ?, NULL, NULL, ?)`
     ).run(msgId, sessionId, firstMessage, now);
 
     const session = parseSession(
-      db.prepare(`SELECT * FROM activity_sessions WHERE id = ?`).get(sessionId) as Record<string, unknown>
+      db.prepare('SELECT * FROM activity_sessions WHERE id = ?').get(sessionId) as Record<string, unknown>
     );
 
     return reply.code(201).send({ session });
@@ -164,7 +231,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     const { sessionId } = req.params as { sessionId: string };
 
     const sessionRow = db
-      .prepare(`SELECT * FROM activity_sessions WHERE id = ? AND student_id = ?`)
+      .prepare('SELECT * FROM activity_sessions WHERE id = ? AND student_id = ?')
       .get(sessionId, user.id) as Record<string, unknown> | undefined;
 
     if (!sessionRow) {
@@ -174,7 +241,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     const session = parseSession(sessionRow);
 
     const activityRow = db
-      .prepare(`SELECT * FROM activities WHERE id = ?`)
+      .prepare('SELECT * FROM activities WHERE id = ?')
       .get(session.activity_id) as Record<string, unknown> | undefined;
 
     if (!activityRow) {
@@ -185,17 +252,11 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const messages = (
       db
-        .prepare(
-          `SELECT * FROM messages WHERE session_id = ? ORDER BY turn_index ASC`
-        )
+        .prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY turn_index ASC')
         .all(sessionId) as Record<string, unknown>[]
     ).map(parseMessage);
 
-    return reply.send({
-      session,
-      activity,
-      messages,
-    } satisfies StudentSessionDetail);
+    return reply.send({ session, activity, messages } satisfies StudentSessionDetail);
   });
 
   // POST /api/student/sessions/:sessionId/messages
@@ -211,9 +272,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     }
 
     const sessionRow = db
-      .prepare(
-        `SELECT * FROM activity_sessions WHERE id = ? AND student_id = ? AND status = 'in_progress'`
-      )
+      .prepare("SELECT * FROM activity_sessions WHERE id = ? AND student_id = ? AND status = 'in_progress'")
       .get(sessionId, user.id) as Record<string, unknown> | undefined;
 
     if (!sessionRow) {
@@ -222,75 +281,47 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const session = parseSession(sessionRow);
 
-    const activityRow = db
-      .prepare(`SELECT * FROM activities WHERE id = ?`)
-      .get(session.activity_id) as Record<string, unknown> | undefined;
-
-    if (!activityRow) {
-      return reply.code(500).send({ error: 'activity not found for session' });
+    if (!session.managed_session_id) {
+      return reply.code(500).send({ error: 'no managed session associated' });
     }
-
-    const activity = parseActivity(activityRow);
-
-    // Load last 20 messages for history
-    const historyRows = (
-      db
-        .prepare(
-          `SELECT role, content FROM messages
-           WHERE session_id = ? AND role IN ('student', 'assistant')
-           ORDER BY turn_index DESC LIMIT 20`
-        )
-        .all(sessionId) as Array<{ role: string; content: string }>
-    ).reverse();
-
-    const recentHistory = historyRows.map((m) => ({
-      role: m.role as 'student' | 'assistant',
-      content: m.content,
-    }));
-
-    // Run the two-agent pipeline
-    const { assistant_content, analyzer_json, next_phase, next_phase_turn_count } =
-      await runTurn(session, content.trim(), recentHistory, activity.config);
 
     const now = new Date().toISOString();
 
-    // Get current max turn_index
     const maxRow = db
-      .prepare(`SELECT MAX(turn_index) as max_idx FROM messages WHERE session_id = ?`)
+      .prepare('SELECT MAX(turn_index) as max_idx FROM messages WHERE session_id = ?')
       .get(sessionId) as { max_idx: number | null };
-
     const nextIndex = (maxRow.max_idx ?? -1) + 1;
 
-    // Persist student message, assistant message, and session update atomically
+    // Persist student message
     const studentMsgId = nanoid();
+    db.prepare(
+      `INSERT INTO messages (id, session_id, turn_index, role, content, phase_at_turn, analyzer_json, created_at)
+       VALUES (?, ?, ?, 'student', ?, NULL, NULL, ?)`
+    ).run(studentMsgId, sessionId, nextIndex, content.trim(), now);
+
+    // Send to Managed Agent and collect response
+    let assistantContent: string;
+    try {
+      assistantContent = await sendAndCollect(session.managed_session_id, content.trim());
+    } catch (err) {
+      console.error('[messages] Failed to get response from agent:', err);
+      return reply.code(502).send({ error: 'Failed to get agent response' });
+    }
+
     const assistantMsgId = nanoid();
-
-    const persist = db.transaction(() => {
-      db.prepare(
-        `INSERT INTO messages (id, session_id, turn_index, role, content, phase_at_turn, analyzer_json, created_at)
-         VALUES (?, ?, ?, 'student', ?, ?, NULL, ?)`
-      ).run(studentMsgId, sessionId, nextIndex, content.trim(), session.current_phase, now);
-
-      db.prepare(
-        `INSERT INTO messages (id, session_id, turn_index, role, content, phase_at_turn, analyzer_json, created_at)
-         VALUES (?, ?, ?, 'assistant', ?, ?, ?, ?)`
-      ).run(assistantMsgId, sessionId, nextIndex + 1, assistant_content, next_phase, analyzer_json, now);
-
-      db.prepare(
-        `UPDATE activity_sessions SET current_phase = ?, phase_turn_count = ? WHERE id = ?`
-      ).run(next_phase, next_phase_turn_count, sessionId);
-    });
-    persist();
+    db.prepare(
+      `INSERT INTO messages (id, session_id, turn_index, role, content, phase_at_turn, analyzer_json, created_at)
+       VALUES (?, ?, ?, 'assistant', ?, NULL, NULL, ?)`
+    ).run(assistantMsgId, sessionId, nextIndex + 1, assistantContent, now);
 
     const updatedSession = parseSession(
-      db.prepare(`SELECT * FROM activity_sessions WHERE id = ?`).get(sessionId) as Record<string, unknown>
+      db.prepare('SELECT * FROM activity_sessions WHERE id = ?').get(sessionId) as Record<string, unknown>
     );
-
     const userMessage = parseMessage(
-      db.prepare(`SELECT * FROM messages WHERE id = ?`).get(studentMsgId) as Record<string, unknown>
+      db.prepare('SELECT * FROM messages WHERE id = ?').get(studentMsgId) as Record<string, unknown>
     );
     const assistantMessage = parseMessage(
-      db.prepare(`SELECT * FROM messages WHERE id = ?`).get(assistantMsgId) as Record<string, unknown>
+      db.prepare('SELECT * FROM messages WHERE id = ?').get(assistantMsgId) as Record<string, unknown>
     );
 
     return reply.send({
@@ -308,9 +339,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     const { sessionId } = req.params as { sessionId: string };
 
     const sessionRow = db
-      .prepare(
-        `SELECT * FROM activity_sessions WHERE id = ? AND student_id = ? AND status = 'in_progress'`
-      )
+      .prepare("SELECT * FROM activity_sessions WHERE id = ? AND student_id = ? AND status = 'in_progress'")
       .get(sessionId, user.id) as Record<string, unknown> | undefined;
 
     if (!sessionRow) {
@@ -319,72 +348,57 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const session = parseSession(sessionRow);
 
-    const messages = (
-      db
-        .prepare(`SELECT * FROM messages WHERE session_id = ? ORDER BY turn_index ASC`)
-        .all(sessionId) as Record<string, unknown>[]
-    ).map(parseMessage);
+    if (!session.managed_session_id) {
+      return reply.code(500).send({ error: 'no managed session associated' });
+    }
 
-    // Get course_id from activity
     const activityRow = db
-      .prepare(`SELECT course_id FROM activities WHERE id = ?`)
+      .prepare('SELECT course_id FROM activities WHERE id = ?')
       .get(session.activity_id) as { course_id: string } | undefined;
 
     if (!activityRow) {
-      return reply.code(500).send({ error: 'activity not found for session' });
+      return reply.code(500).send({ error: 'activity not found' });
     }
 
     const courseId = activityRow.course_id;
 
-    // Get previous ideas for this student in this course
-    const previousIdeas = (
-      db
-        .prepare(
-          `SELECT * FROM student_ideas WHERE student_id = ? AND course_id = ? ORDER BY created_at ASC`
-        )
-        .all(user.id, courseId) as Record<string, unknown>[]
-    ).map(parseStudentIdea);
-
-    const result = await closeSession(session, messages, previousIdeas);
+    let result;
+    try {
+      result = await sendCloseAndCollect(session.managed_session_id);
+    } catch (err) {
+      console.error('[close] Failed to close managed session:', err);
+      result = {
+        session_summary: 'La sesión fue completada.',
+        teacher_report: '## Observaciones\n\nSesión completada.',
+        extracted_ideas: [],
+      };
+    }
 
     const now = new Date().toISOString();
 
-    // Update session and insert extracted ideas atomically
-    const closeTransaction = db.transaction(() => {
+    const persist = db.transaction(() => {
       db.prepare(
         `UPDATE activity_sessions
          SET status = 'completed', completed_at = ?, session_summary = ?, teacher_report = ?,
-             extracted_ideas = ?, current_phase = 'consolidation'
+             extracted_ideas = ?
          WHERE id = ?`
-      ).run(
-        now,
-        result.session_summary,
-        result.teacher_report,
-        jsonStringify(result.extracted_ideas),
-        sessionId
-      );
+      ).run(now, result.session_summary, result.teacher_report, jsonStringify(result.extracted_ideas), sessionId);
 
       for (const idea of result.extracted_ideas) {
         db.prepare(
           `INSERT INTO student_ideas
            (id, student_id, course_id, activity_id, session_id, text, question_that_triggered_it, connections, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?)`
-        ).run(
-          nanoid(),
-          user.id,
-          courseId,
-          session.activity_id,
-          sessionId,
-          idea.text,
-          idea.question_that_triggered_it,
-          now
-        );
+        ).run(nanoid(), user.id, courseId, session.activity_id, sessionId, idea.text, idea.question_that_triggered_it ?? null, now);
       }
     });
-    closeTransaction();
+    persist();
+
+    // Archive the managed session (fire and forget)
+    archiveSession(session.managed_session_id).catch(() => {});
 
     const updatedSession = parseSession(
-      db.prepare(`SELECT * FROM activity_sessions WHERE id = ?`).get(sessionId) as Record<string, unknown>
+      db.prepare('SELECT * FROM activity_sessions WHERE id = ?').get(sessionId) as Record<string, unknown>
     );
 
     return reply.send({ session: updatedSession } satisfies CloseSessionResponse);
@@ -406,11 +420,8 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const items = courses.map((course) => {
       const ideaCountRow = db
-        .prepare(
-          `SELECT COUNT(*) as count FROM student_ideas WHERE student_id = ? AND course_id = ?`
-        )
+        .prepare('SELECT COUNT(*) as count FROM student_ideas WHERE student_id = ? AND course_id = ?')
         .get(user.id, course.id) as { count: number };
-
       return {
         course: course as unknown as Course,
         idea_count: ideaCountRow.count,
@@ -426,16 +437,13 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     if (!user) return;
 
     const { course_id } = req.query as { course_id?: string };
-
     if (!course_id) {
       return reply.code(400).send({ error: 'course_id query param required' });
     }
 
     const ideas = (
       db
-        .prepare(
-          `SELECT * FROM student_ideas WHERE student_id = ? AND course_id = ? ORDER BY created_at ASC`
-        )
+        .prepare('SELECT * FROM student_ideas WHERE student_id = ? AND course_id = ? ORDER BY created_at ASC')
         .all(user.id, course_id) as Record<string, unknown>[]
     ).map(parseStudentIdea);
 
@@ -449,19 +457,15 @@ export async function registerStudentRoutes(app: FastifyInstance) {
 
     const sessionRows = (
       db
-        .prepare(
-          `SELECT * FROM activity_sessions WHERE student_id = ? ORDER BY started_at DESC`
-        )
+        .prepare('SELECT * FROM activity_sessions WHERE student_id = ? ORDER BY started_at DESC')
         .all(user.id) as Record<string, unknown>[]
     ).map(parseSession);
 
     const items = sessionRows.flatMap((session) => {
       const activityRow = db
-        .prepare(`SELECT * FROM activities WHERE id = ?`)
+        .prepare('SELECT * FROM activities WHERE id = ?')
         .get(session.activity_id) as Record<string, unknown> | undefined;
-
       if (!activityRow) return [];
-
       return [{ session, activity: parseActivity(activityRow) }];
     });
 
