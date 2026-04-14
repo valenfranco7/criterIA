@@ -8,6 +8,7 @@ import {
   sendCloseAndCollect,
   archiveSession,
 } from './socratic/agent.js';
+import { refreshStudentProfile } from './profile-updater.js';
 import type {
   Activity,
   ActivityConfig,
@@ -29,8 +30,9 @@ import type {
 
 function parseSession(row: Record<string, unknown>): ActivitySession {
   return {
-    ...(row as unknown as Omit<ActivitySession, 'extracted_ideas'>),
+    ...(row as unknown as Omit<ActivitySession, 'extracted_ideas' | 'difficult_topics'>),
     extracted_ideas: jsonParse<ExtractedIdea[]>(row.extracted_ideas as string, []),
+    difficult_topics: jsonParse<string[]>(row.difficult_topics as string, []),
   };
 }
 
@@ -186,7 +188,7 @@ export async function registerStudentRoutes(app: FastifyInstance) {
     // Create Managed Agent session
     let managedSessionId: string;
     try {
-      managedSessionId = await createManagedSession();
+      managedSessionId = await createManagedSession(activity.anthropic_file_id);
     } catch (err) {
       console.error('[start] Failed to create managed session:', err);
       return reply.code(503).send({ error: 'Failed to create agent session' });
@@ -380,9 +382,9 @@ export async function registerStudentRoutes(app: FastifyInstance) {
       db.prepare(
         `UPDATE activity_sessions
          SET status = 'completed', completed_at = ?, session_summary = ?, teacher_report = ?,
-             extracted_ideas = ?
+             extracted_ideas = ?, comprehension_pct = ?, difficult_topics = ?
          WHERE id = ?`
-      ).run(now, result.session_summary, result.teacher_report, jsonStringify(result.extracted_ideas), sessionId);
+      ).run(now, result.session_summary, result.teacher_report, jsonStringify(result.extracted_ideas), result.comprehension_pct, jsonStringify(result.difficult_topics), sessionId);
 
       for (const idea of result.extracted_ideas) {
         db.prepare(
@@ -393,6 +395,14 @@ export async function registerStudentRoutes(app: FastifyInstance) {
       }
     });
     persist();
+
+    // Fire-and-forget: update student profile based on all their sessions
+    refreshStudentProfile(user.id)
+      .then(({ summary }) => {
+        db.prepare('UPDATE student_profiles SET summary = ?, updated_at = ? WHERE student_id = ?')
+          .run(summary, new Date().toISOString(), user.id);
+      })
+      .catch((err) => console.error('[close] Profile update failed:', err));
 
     // Archive the managed session (fire and forget)
     archiveSession(session.managed_session_id).catch(() => {});
